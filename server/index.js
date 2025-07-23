@@ -7,10 +7,15 @@ import router from "./app.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import { errorHandler } from "./src/middlewares/errorHandler.js";
+import { initSocket } from "./src/socket/socket.js";
+import http from "http";
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+
+const server = http.createServer(app);
+initSocket(server);
 
 app.use(cors({
     origin: ['http://localhost:5173', 'http://localhost:3000'], // Add both ports

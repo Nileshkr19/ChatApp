@@ -14,25 +14,114 @@ datasource db {
 }
 
 model User {
-  id String @id @default(cuid())
-  name String
-  email String @unique
-  password String
-  profileImage String?
-  bio String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  isOnline Boolean @default(false)
-  lastSeen DateTime?
-  refreshTokens RefreshToken[]
+  id               String             @id @default(cuid())
+  name             String
+  email            String             @unique
+  password         String
+  profileImage     String?
+  bio              String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  isOnline         Boolean            @default(false)
+  lastSeen         DateTime?
+  refreshTokens    RefreshToken[]
+  sentMessages     Message[]
+  chats            ChatParticipants[]
+  messageReactions MessageReaction[]
+  notifications    Notification[]
+  messageReads     MessageRead[]
+  createdChats     Chat[]             @relation("ChatCreator")
 }
 
 model RefreshToken {
-  id String @id @default(cuid())
-  userId String
-  token String @unique
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
-  user User @relation(fields: [userId], references: [id])
-  isRevoked Boolean @default(false)
+  user      User     @relation(fields: [userId], references: [id])
+  isRevoked Boolean  @default(false)
+}
+
+model Message {
+  id               String            @id @default(cuid())
+  senderId         String
+  content          String
+  messageType      String            @default("text") // text, image, file, etc.
+  fileUrl          String? // For file/image messages
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  sender           User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  chatId           String
+  chat             Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  readBy           MessageRead[]
+  isEdited         Boolean           @default(false)
+  isDeleted        Boolean           @default(false) // Soft delete
+  messageReactions MessageReaction[]
+
+  @@index([chatId, createdAt])
+}
+
+model Chat {
+  id            String             @id @default(cuid())
+  name          String? // For group chats
+  type          String             @default("private") // private, group
+  participants  ChatParticipants[]
+  messages      Message[]
+  lastMessageAt DateTime?
+  createdBy     String?
+  creator       User?              @relation("ChatCreator", fields: [createdBy], references: [id])
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  isDeleted     Boolean            @default(false) // Soft delete
+
+  @@index([updatedAt])
+}
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+model ChatParticipants {
+  id       String   @id @default(cuid())
+  chatId   String
+  userId   String
+  joinedAt DateTime @default(now())
+  role     String   @default("member") // member, admin, owner
+  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  type      String // e.g. "like", "love", "laugh", etc.
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String // e.g. "message", "mention", etc.
+  content   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

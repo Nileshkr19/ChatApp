@@ -589,6 +589,36 @@ JWT_REFRESH_EXPIRES_IN="7d"
 - **expiresAt**: Token expiration
 - **isRevoked**: Revocation status
 
+### Chat Model
+
+- **id**: Unique identifier (CUID)
+- **name**: Optional chat name (for group chats)
+- **type**: Chat type (private, group)
+- **participants**: Users in the chat
+- **messages**: All messages in the chat
+- **lastMessageAt**: Timestamp of last message
+- **createdBy**: User who created the chat
+- **createdAt/updatedAt**: Timestamp tracking
+
+### Message Model
+
+- **id**: Unique identifier (CUID)
+- **senderId**: Reference to User who sent the message
+- **content**: Message text content
+- **messageType**: Type of message (text, image, file)
+- **fileUrl**: Optional file URL for media messages
+- **chatId**: Reference to Chat
+- **readBy**: Read receipts tracking
+- **isEdited**: Whether message was edited
+- **createdAt/updatedAt**: Timestamp tracking
+
+### MessageRead Model
+
+- **id**: Unique identifier (CUID)
+- **messageId**: Reference to Message
+- **userId**: Reference to User who read the message
+- **readAt**: When the message was read
+
 ## 🔐 Security Notes
 
 1. **Never commit your `.env` file** - It contains sensitive information
