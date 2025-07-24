@@ -1,35 +1,68 @@
-# Chat App Server
+# 💬 Chat App Server
 
-A Node.js/Express server for a real-time chat application with user authentication and file upload capabilities, built with Prisma ORM and PostgreSQL.
+A modern, full-featured Node.js/Express chat application server with comprehensive API testing, real-time messaging capabilities, and secure user authentication.
 
-## 🚀 Features
+## ✨ Features
 
-- Express.js REST API server
-- User authentication system with JWT (Access & Refresh tokens)
-- User management with profiles and online status
-- File upload with Cloudinary integration
-- PostgreSQL database with Prisma ORM
+### 🔐 Authentication & User Management
+
+- JWT-based authentication (Access & Refresh tokens)
 - Secure password hashing with bcrypt
-- CORS enabled for cross-origin requests
-- Cookie-based authentication
-- Environment-based configuration
-- Real-time communication ready (Socket.io structure in place)
+- Cookie-based session management
+- User profiles with bio and online status
+- Protected routes with middleware
+
+### 💬 Chat System
+
+- Create and manage chat conversations
+- Real-time messaging with Socket.io
+- Message CRUD operations
+- Chat participant management
+
+### 📁 File Management
+
+- File upload with Cloudinary integration
+- Multer middleware for file handling
+- Secure file storage and retrieval
+
+### 🗄️ Database
+
+- PostgreSQL with Prisma ORM
+- Automated migrations
+- Type-safe database operations
+- Relationship management
+
+### 🧪 Testing
+
+- **Comprehensive Cypress E2E test suite**
+- **12 automated tests** covering all API endpoints
+- Authentication flow testing
+- Chat and message API testing
+- Shared helper functions for test reusability
+
+## 🏗️ Tech Stack
+
+- **Backend**: Node.js, Express.js
+- **Database**: PostgreSQL, Prisma ORM
+- **Authentication**: JWT, bcrypt
+- **File Storage**: Cloudinary
+- **Real-time**: Socket.io
+- **Testing**: Cypress E2E Testing
+- **Environment**: dotenv
 
 ## 📋 Prerequisites
 
-Before setting up the project, make sure you have the following installed:
-
 - [Node.js](https://nodejs.org/) (v16 or higher)
-- [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
 - [PostgreSQL](https://www.postgresql.org/) database
-- [Cloudinary](https://cloudinary.com/) account for file uploads
+- [Cloudinary](https://cloudinary.com/) account
 
 ## 🛠️ Installation
 
-1. **Clone the repository** (if applicable) or navigate to the server directory:
+1. **Clone and navigate:**
 
    ```bash
-   cd "Chat App/server"
+   git clone https://github.com/Nileshkr19/ChatApp.git
+   cd ChatApp/server
    ```
 
 2. **Install dependencies:**
@@ -39,35 +72,27 @@ Before setting up the project, make sure you have the following installed:
 
 ## ⚙️ Environment Setup
 
-1. **Create a `.env` file** in the root directory and add the following environment variables:
+Create a `.env` file in the root directory:
 
-   ````env
-   # Server Configuration
-   PORT=3000
-   NODE_ENV=development
+```env
+# Server Configuration
+PORT=5000
+NODE_ENV=development
 
-   # Database Configuration
-   DATABASE_URL="postgresql://username:password@localhost:5432/chatapp_db"
+# Database Configuration
+DATABASE_URL="postgresql://username:password@localhost:5432/chatapp_db"
 
-   # JWT Configuration
-   JWT_SECRET="your-super-secret-jwt-key"
-   JWT_EXPIRES_IN="15m"
-   JWT_REFRESH_SECRET="your-super-secret-refresh-jwt-key"
-   JWT_REFRESH_EXPIRES_IN="7d"
+# JWT Configuration
+JWT_SECRET="your-super-secret-jwt-key"
+JWT_EXPIRES_IN="2h"
+JWT_REFRESH_SECRET="your-super-secret-refresh-jwt-key"
+JWT_REFRESH_EXPIRES_IN="7d"
 
-   # Cloudinary Configuration
-   CLOUDINARY_CLOUD_NAME="your-cloudinary-cloud-name"
-   CLOUDINARY_API_KEY="your-cloudinary-api-key"
-   CLOUDINARY_API_SECRET="your-cloudinary-api-secret"
-   ```2. **Replace the placeholder values:**
-   - `DATABASE_URL`: Your PostgreSQL database connection string
-   - `NODE_ENV`: Set to "development" for dev, "production" for prod
-   - `JWT_SECRET`: A secure random string for access token signing (use a long, random string)
-   - `JWT_EXPIRES_IN`: Access token expiration time (e.g., "15m", "1h")
-   - `JWT_REFRESH_SECRET`: A different secure random string for refresh token signing
-   - `JWT_REFRESH_EXPIRES_IN`: Refresh token expiration time (e.g., "7d", "30d")
-   - Cloudinary credentials: Get these from your Cloudinary dashboard
-   ````
+# Cloudinary Configuration
+CLOUDINARY_CLOUD_NAME="your-cloudinary-cloud-name"
+CLOUDINARY_API_KEY="your-cloudinary-api-key"
+CLOUDINARY_API_SECRET="your-cloudinary-api-secret"
+```
 
 ## 🗄️ Database Setup
 
@@ -77,19 +102,13 @@ Before setting up the project, make sure you have the following installed:
    npx prisma generate
    ```
 
-2. **Run database migrations:**
+2. **Run migrations:**
 
    ```bash
    npx prisma migrate dev --name init
    ```
 
-3. **Optional: Seed the database** (if you have seed files):
-
-   ```bash
-   npx prisma db seed
-   ```
-
-4. **View your database** (optional):
+3. **View database (optional):**
    ```bash
    npx prisma studio
    ```
@@ -97,6 +116,130 @@ Before setting up the project, make sure you have the following installed:
 ## 🚀 Running the Application
 
 ### Development Mode
+
+```bash
+npm run dev
+```
+
+Server runs on `http://localhost:5000`
+
+### Production Mode
+
+```bash
+npm start
+```
+
+## 🧪 Testing
+
+### Run All Tests
+
+```bash
+npm run cy:test
+```
+
+### Interactive Testing
+
+```bash
+npm run cy:open
+```
+
+### Test Coverage
+
+- **Authentication Tests** (6 tests): Registration, login, logout, protected routes
+- **Chat Tests** (4 tests): Create, fetch, update, delete chats
+- **Message Tests** (2 tests): Send messages, fetch chat messages
+
+## 📡 API Endpoints
+
+### 🔐 Authentication Routes (`/api/v1/users`)
+
+```
+POST   /register     - Register new user
+POST   /login        - User login
+POST   /logout       - User logout
+GET    /me           - Get current user profile
+PUT    /profile      - Update user profile
+```
+
+### 💬 Chat Routes (`/api/v1/chats`)
+
+```
+GET    /             - Get all user chats
+POST   /             - Create new chat
+GET    /:id          - Get specific chat
+DELETE /:id          - Delete chat
+```
+
+### 📝 Message Routes (`/api/v1/messages`)
+
+```
+POST   /             - Send message
+GET    /:chatId      - Get chat messages
+PUT    /:messageId/edit    - Edit message
+DELETE /:messageId/delete - Delete message
+POST   /:messageId/read   - Mark as read
+```
+
+### 🔄 Token Routes (`/api/v1/tokens`)
+
+```
+POST   /refresh      - Refresh access token
+```
+
+## 📁 Project Structure
+
+```
+server/
+├── 📁 src/
+│   ├── 📁 controllers/     # Request handlers
+│   ├── 📁 middlewares/     # Auth, error handling
+│   ├── 📁 routes/          # API route definitions
+│   ├── 📁 utils/           # Helper functions
+│   ├── � config/          # Database config
+│   └── 📁 socket/          # Real-time messaging
+├── 📁 cypress/             # E2E test suite
+│   ├── 📁 e2e/            # Test files
+│   └── 📁 support/        # Test helpers
+├── 📁 prisma/             # Database schema
+├── 📄 app.js              # Express app setup
+├── 📄 index.js            # Server entry point
+└── 📄 cypress.config.js   # Test configuration
+```
+
+## 🛡️ Security Features
+
+- Password hashing with bcrypt
+- JWT token-based authentication
+- HTTP-only cookies for token storage
+- CORS configuration
+- Input validation and sanitization
+- Protected routes with auth middleware
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 Testing Guidelines
+
+- All new features should include corresponding tests
+- Run tests before submitting PRs: `npm run cy:test`
+- Tests are automatically run on GitHub Actions (coming soon)
+
+## � License
+
+This project is licensed under the ISC License.
+
+## 👨‍💻 Author
+
+**Nilesh Kumar** - [GitHub](https://github.com/Nileshkr19)
+
+---
+
+⭐ **Star this repo if you found it helpful!**
 
 ```bash
 npm run dev
