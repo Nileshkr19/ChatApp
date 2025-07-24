@@ -16,7 +16,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
 
   const userId = req.user.id;
 
-  // Check if chat exists, is not deleted, and user is a participant
+  // Check if chat exists, is not deleted, and user is a participant 
   const existingChat = await prisma.chat.findUnique({
     where: {
       id: chatId,

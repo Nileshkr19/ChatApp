@@ -6,10 +6,9 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "cross-env NODE_ENV=test jest"
-  },
-  "jest": {
-    "testEnvironment": "node"
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "cy:test": "start-server-and-test dev http://localhost:5000 cy:run"
   },
   "keywords": [],
   "author": "",
@@ -32,10 +31,7 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.28.0",
-    "babel-jest": "^29.7.0",
-    "cross-env": "^7.0.3",
-    "jest": "^29.7.0",
-    "supertest": "^7.1.4"
+    "cypress": "^14.5.2",
+    "start-server-and-test": "^2.0.12"
   }
 }

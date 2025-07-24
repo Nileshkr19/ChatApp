@@ -40,6 +40,13 @@ const registerUser = asyncHandler(async (req, res) => {
   const accessToken = await generateAccessToken(newUser);
   const refreshToken = await generateRefreshToken(newUser);
 
+  // Clean up any existing refresh tokens (shouldn't exist for new user, but just to be safe)
+  await prisma.refreshToken.deleteMany({
+    where: {
+      userId: newUser.id,
+    },
+  });
+
   await prisma.refreshToken.create({
     data: {
       userId: newUser.id,
@@ -107,6 +114,13 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Error generating tokens");
   }
 
+  // Delete existing refresh tokens for this user to avoid unique constraint violation
+  await prisma.refreshToken.deleteMany({
+    where: {
+      userId: userExists.id,
+    },
+  });
+
   await prisma.refreshToken.create({
     data: {
       userId: userExists.id,
@@ -148,49 +162,45 @@ const loginUser = asyncHandler(async (req, res) => {
   );
 });
 
-const logoutUser = asyncHandler (async (req, res) =>{
-    const refreshToken = req.cookies.refreshToken;
-    
-    if (!refreshToken) {
-        throw new ApiError(401, "No refresh token provided");
-    }
-    
-    await prisma.refreshToken.deleteMany({
-        where: { token: refreshToken },
-    });
-    
-    res.clearCookie("refreshToken");
-    res.clearCookie("accessToken");
-    
-    return res.status(200).json(
-        new ApiResponse(200, {}, "User logged out successfully")
-    );
-})
+const logoutUser = asyncHandler(async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    throw new ApiError(401, "No refresh token provided");
+  }
+
+  await prisma.refreshToken.deleteMany({
+    where: { token: refreshToken },
+  });
+
+  res.clearCookie("refreshToken");
+  res.clearCookie("accessToken");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "User logged out successfully"));
+});
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-    const userId = req.user.id; // Assuming user ID is stored in req.user by authentication middleware
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            profileImage: true,
-            bio: true,
-        }
-    });
+  const userId = req.user.id; // Assuming user ID is stored in req.user by authentication middleware
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      profileImage: true,
+      bio: true,
+    },
+  });
 
-    if (!user) {
-        throw new ApiError(404, "User not found");
-    }
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
 
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            { user },
-            "User retrieved successfully"
-        )
-    );
-})
+  return res
+    .status(200)
+    .json(new ApiResponse(200, { user }, "User retrieved successfully"));
+});
 
 export { registerUser, loginUser, logoutUser, getCurrentUser };
