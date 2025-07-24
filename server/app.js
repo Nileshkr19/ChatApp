@@ -1,10 +1,10 @@
-import { Router } from "express";
+import express from "express";
 import userRoutes from "./src/routes/user.routes.js";
 import tokensRoutes from "./src/routes/tokens.routes.js";
 import chatsRoutes from "./src/routes/chats.routes.js";
 import messagesRoutes from "./src/routes/message.routes.js";
 
-const router = Router();
+const router = express.Router();
 
 router.use("/api/v1/users", userRoutes);
 router.use("/api/v1/tokens", tokensRoutes);

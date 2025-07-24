@@ -17,12 +17,14 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 initSocket(server);
 
-app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:3000'], // Add both ports
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://localhost:3000"], // Add both ports
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-}));
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie"],
+  })
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -33,7 +35,8 @@ app.use(router);
 // Global error handling middleware (should be last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
   console.log(`http://localhost:${PORT}`);
+  console.log("🚀 Socket.io server initialized");
 });
