@@ -25,7 +25,7 @@ describe("User Authentication Flow", () => {
     const newUser = {
       name: "Another Test User",
       email: `test${Date.now()}@example.com`,
-      password: "test@1234",
+      password: "Test@1234",
       bio: "Another automated test user",
     };
 

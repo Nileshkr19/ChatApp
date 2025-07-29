@@ -9,13 +9,13 @@ export function createTestUsers() {
   const user1 = {
     name: "User1",
     email: `user1_${timestamp}@test.com`,
-    password: "test@1234",
+    password: "Test@1234",
     bio: "Test user 1",
   };
   const user2 = {
     name: "User2",
     email: `user2_${timestamp}@test.com`,
-    password: "test@1234",
+    password: "Test@1234",
     bio: "Test user 2",
   };
 
@@ -92,7 +92,7 @@ export function createSingleTestUser(namePrefix = "Test User") {
   const user = {
     name: `${namePrefix}`,
     email: `test_${timestamp}@example.com`,
-    password: "test@1234",
+    password: "Test@1234",
     bio: "Automated test user",
   };
 

@@ -9,13 +9,27 @@ import {
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import ms from "ms";
+import validatePassword from "../utils/validatePassword.js";
 
 const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password, profilePicture, bio } = req.body;
-
+  const { name, email, password, profileImage, bio } = req.body;
+  // Validate required fields
   if (!name || !email || !password) {
     throw new ApiError(400, "Name, email, and password are required");
   }
+
+  // check email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new ApiError(400, "Invalid email format");
+  }
+
+  // Validate password strength
+  const { isValid, errors } = validatePassword(password);
+  if (!isValid) {
+    throw new ApiError(400, `Password validation failed: ${errors.join(", ")}`);
+  }
+
   const existingUser = await prisma.user.findUnique({
     where: { email },
   });
@@ -28,50 +42,58 @@ const registerUser = asyncHandler(async (req, res) => {
   if (!hashedPassword) {
     throw new ApiError(500, "Error hashing password");
   }
-  const newUser = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      profileImage: profilePicture || null,
-      bio,
-    },
-  });
-  const accessToken = await generateAccessToken(newUser);
-  const refreshToken = await generateRefreshToken(newUser);
 
-  // Clean up any existing refresh tokens (shouldn't exist for new user, but just to be safe)
-  await prisma.refreshToken.deleteMany({
-    where: {
-      userId: newUser.id,
-    },
+  const result = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        profileImage: profileImage || null,
+        bio: bio || null,
+      },
+    });
+
+    const accessToken = await generateAccessToken(newUser);
+    const refreshToken = await generateRefreshToken(newUser);
+
+    if (!accessToken || !refreshToken) {
+      throw new ApiError(500, "Error generating tokens");
+    }
+
+    // Clean up any existing refresh tokens (shouldn't exist for new user, but just to be safe)
+    await tx.refreshToken.deleteMany({
+      where: {
+        userId: newUser.id,
+      },
+    });
+
+    await tx.refreshToken.create({
+      data: {
+        userId: newUser.id,
+        token: refreshToken,
+        expiresAt: new Date(
+          Date.now() + ms(process.env.JWT_REFRESH_EXPIRES_IN || "7d") // Default to 7 days if not set
+        ),
+      },
+    });
+    return { newUser, accessToken, refreshToken };
   });
 
-  await prisma.refreshToken.create({
-    data: {
-      userId: newUser.id,
-      token: refreshToken,
-      expiresAt: new Date(
-        Date.now() +
-          (process.env.JWT_REFRESH_EXPIRES_IN
-            ? parseInt(process.env.JWT_REFRESH_EXPIRES_IN) * 24 * 60 * 60 * 1000
-            : 7 * 24 * 60 * 60 * 1000)
-      ),
-    },
-  });
+  const { newUser, accessToken, refreshToken } = result;
 
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
-    maxAge: ms(process.env.JWT_REFRESH_EXPIRES_IN),
+    maxAge: ms(process.env.JWT_REFRESH_EXPIRES_IN || "7d"), // Default to 7 days if not set
   });
 
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
-    maxAge: ms(process.env.JWT_EXPIRES_IN),
+    maxAge: ms(process.env.JWT_EXPIRES_IN || "2h"), // Default to 15 minutes if not set,
   });
 
   return res.status(201).json(
@@ -82,7 +104,7 @@ const registerUser = asyncHandler(async (req, res) => {
           id: newUser.id,
           name: newUser.name,
           email: newUser.email,
-          profilePicture: newUser.profilePicture,
+          profileImage: newUser.profileImage,
           bio: newUser.bio,
         },
       },
@@ -97,6 +119,13 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!email || !password) {
     throw new ApiError(400, "Email and password are required");
   }
+
+  // check email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    throw new ApiError(400, "Invalid email format");
+  }
+
   const userExists = await prisma.user.findUnique({
     where: { email },
   });
@@ -108,42 +137,45 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Wrong password");
   }
 
-  const accessToken = await generateAccessToken(userExists);
-  const refreshToken = await generateRefreshToken(userExists);
-  if (!accessToken || !refreshToken) {
-    throw new ApiError(500, "Error generating tokens");
-  }
+  const result = await prisma.$transaction(async (tx) => {
+    const accessToken = await generateAccessToken(userExists);
+    const refreshToken = await generateRefreshToken(userExists);
 
-  // Delete existing refresh tokens for this user to avoid unique constraint violation
-  await prisma.refreshToken.deleteMany({
-    where: {
-      userId: userExists.id,
-    },
+    if (!accessToken || !refreshToken) {
+      throw new ApiError(500, "Error generating tokens");
+    }
+
+    await tx.refreshToken.deleteMany({
+      where: {
+        userId: userExists.id,
+      },
+    });
+
+    await tx.refreshToken.create({
+      data: {
+        userId: userExists.id,
+        token: refreshToken,
+        expiresAt: new Date(
+          Date.now() + ms(process.env.JWT_REFRESH_EXPIRES_IN || "7d") // Default to 7 days if not set
+        ),
+      },
+    });
+    return { accessToken, refreshToken };
   });
 
-  await prisma.refreshToken.create({
-    data: {
-      userId: userExists.id,
-      token: refreshToken,
-      expiresAt: new Date(
-        Date.now() +
-          (process.env.JWT_REFRESH_EXPIRES_IN
-            ? parseInt(process.env.JWT_REFRESH_EXPIRES_IN) * 24 * 60 * 60 * 1000
-            : 7 * 24 * 60 * 60 * 1000)
-      ),
-    },
-  });
+  const { accessToken, refreshToken } = result;
+
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
-    maxAge: ms(process.env.JWT_REFRESH_EXPIRES_IN),
+    maxAge: ms(process.env.JWT_REFRESH_EXPIRES_IN || "7d"), // Default to 7 days if not set
   });
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
-    maxAge: ms(process.env.JWT_EXPIRES_IN),
+    maxAge: ms(process.env.JWT_EXPIRES_IN || "2h"), // Default to 2 hours if not set
   });
   return res.status(200).json(
     new ApiResponse(
@@ -153,7 +185,7 @@ const loginUser = asyncHandler(async (req, res) => {
           id: userExists.id,
           name: userExists.name,
           email: userExists.email,
-          profilePicture: userExists.profilePicture,
+          profileImage: userExists.profileImage,
           bio: userExists.bio,
         },
       },
@@ -173,8 +205,16 @@ const logoutUser = asyncHandler(async (req, res) => {
     where: { token: refreshToken },
   });
 
-  res.clearCookie("refreshToken");
-  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+  });
+  res.clearCookie("accessToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+  });
 
   return res
     .status(200)
