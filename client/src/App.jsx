@@ -1,11 +1,15 @@
 import React from 'react'
 import AppRoutes from './Routes/AppRoutes';
+import { AuthProvider } from './context/AuthContext';
+import ErrorBoundary from './utils/ErrorBoundary';
 
 const App = () => {
   return (
-    <div>
+    <ErrorBoundary>
+    <AuthProvider>
       <AppRoutes />
-    </div>
+    </AuthProvider>
+    </ErrorBoundary>
   )
 }
 export default App

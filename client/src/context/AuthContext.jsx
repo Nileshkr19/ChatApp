@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { authServices } from '@/services/authServices';
+import { checkAuthStatus } from '@/utils/checkAuthStatus';
 
 const AuthContext = createContext();
 
@@ -12,55 +14,104 @@ export const useAuth = () =>{
 
 export const AuthProvider = ({children}) => {
     const [user, setUser] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
     useEffect(() => {
-        const checkAuthStatus = () => {
-            try {
-                const token = localStorage.getItem('token');
-                const userData = localStorage.getItem('user');
+      const initAuth = async () => {
+        setIsLoading(true);
+        const authStatus = await  checkAuthStatus()
 
-                if (token && userData) {
-                    setUser(JSON.parse(userData));
-                }
-            } catch (error) {
-                console.error("Error checking auth status:", error);
-            }
-            finally {
-                setIsLoading(false);
-            }
+        if(authStatus.isAuthenticated) {
+            setUser(authStatus.user);
+            setIsAuthenticated(true);
         }
+        else {
+            setUser(null);
+            setIsAuthenticated(false);
+        }
+        setIsLoading(false);
+      }
 
-        checkAuthStatus();
+      initAuth()
     }, []);
 
-    const login = (userData) => {
-        setUser(userData);
-       localStorage.setItem('authToken', token);
-    localStorage.setItem('userData', JSON.stringify(userData));
-    setUser(userData);
+    const login = async (email, password) => {
+      const result = await authServices.login(email, password)
+      if(result.success) {
+        setUser(result.user);
+        setIsAuthenticated(true);
+      }
+      return result;
     }
 
-     const logout = () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userData');
-    setUser(null);
-  };
 
-  const register = (userData) => {
-    setUser(userData);
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('userData', JSON.stringify(userData));
-    setUser(userData);
+  const register = async(userData) => {
+    const errors = {}
+
+    if(!userData.name?.trim()){
+        errors.name = "full name is required";
+    }
+    if(!userData.email?.trim()){
+        errors.email = "email is required";
+    }
+    if (!userData.password?.trim()) {
+            errors.password = "Password is required";
+        }
+        
+        if (userData.password !== userData.confirmPassword) {
+            errors.confirmPassword = "Passwords don't match";
+        }
+
+        if (Object.keys(errors).length > 0) {
+            return {
+                success: false,
+                errors
+            };
+        }
+
+         const backendData = {
+            name: userData.name,
+            email: userData.email,
+            password: userData.password,
+            bio: userData.bio || ""
+        };
+
+         const result = await authServices.register(backendData);
+        
+        if (result.success) {
+            setUser(result.user);
+            setIsAuthenticated(true); // ✅ This will trigger redirect
+        }
+        
+        return {
+            success: result.success,
+            message: result.message,
+            errors: result.errors || (result.success ? {} : { general: result.message }),
+        };
+  }
+
+  const logout = async () => {
+    const result = await authServices.logout();
+   
+        setUser(null);
+        setIsAuthenticated(false);
+        return result;
+  }
+
+  const updateUser = (updatedUser) => {
+    setUser(updatedUser)
+    authServices.updateUserInfo(updatedUser);
   }
 
   const value = {
-   user,
-    login,
-    logout,
-    register,
-    isLoading,
-    isAuthenticated: !!user
+        user,
+        isLoading,
+        isAuthenticated,
+        login,
+        register,
+        logout,
+        updateUser
   }
 
     return (

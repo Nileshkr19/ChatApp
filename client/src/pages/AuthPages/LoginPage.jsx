@@ -1,78 +1,80 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-export const LoginPage = () => {
+const LoginPage = () => {
   const navigate = useNavigate();
-
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  
   const [formData, setFormData] = useState({
     email: "",
-    password: "",
+    password: ""
   });
+  
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: "",
-      });
+    // Clear errors when user starts typing
+    if (errors[name] || errors.general) {
+      setErrors({});
     }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    return newErrors;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const newErrors = validateForm();
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
     setIsLoading(true);
     setErrors({});
 
-   try {
-    await new Promise(resolve => setTimeout)
-   }
-   catch (error) {
-    console.error("Login failed:", error);
-    setErrors({ form: "Login failed. Please try again." });
-   }
-  }; console.log("Form submitted:", { ...formData, rememberMe });
-    // Add your login logic here, like API calls
+    try {
+      const result = await login(formData.email, formData.password);
+      
+      if (!result.success) {
+        setErrors({ 
+          general: result.message || "Login failed. Please try again." 
+        });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setErrors({ 
+        general: "Something went wrong. Please try again." 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl">
+          <div className="flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+            <span className="text-gray-700">Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center p-4">
@@ -80,20 +82,28 @@ export const LoginPage = () => {
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-center">
           <h1 className="text-2xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-purple-100 text-sm">
-            Sign in to your account to continue
-          </p>
+          <p className="text-purple-100 text-sm">Sign in to continue chatting!</p>
         </div>
 
         {/* Form */}
         <div className="p-6">
+          {/* ✅ Error Display at Top of Form */}
+          {errors.general && (
+            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Login Failed</h3>
+                  <p className="mt-1 text-sm text-red-700">{errors.general}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email Field */}
             <div>
-              <Label
-                htmlFor="email"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-1 block">
                 Email Address
               </Label>
               <div className="relative">
@@ -105,24 +115,15 @@ export const LoginPage = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="Enter your email"
-                  className={`pl-10 py-3 bg-gray-50 border-2 focus:bg-white transition-colors ${
-                    errors.email
-                      ? "border-red-300 focus:border-red-500"
-                      : "border-gray-200 focus:border-purple-500"
-                  }`}
+                  className="pl-10 py-3 bg-gray-50 border-2 focus:bg-white focus:border-purple-500 transition-colors"
+                  required
                 />
               </div>
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-              )}
             </div>
 
             {/* Password Field */}
             <div>
-              <Label
-                htmlFor="password"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700 mb-1 block">
                 Password
               </Label>
               <div className="relative">
@@ -134,11 +135,8 @@ export const LoginPage = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Enter your password"
-                  className={`pl-10 pr-12 py-3 bg-gray-50 border-2 focus:bg-white transition-colors ${
-                    errors.password
-                      ? "border-red-300 focus:border-red-500"
-                      : "border-gray-200 focus:border-purple-500"
-                  }`}
+                  className="pl-10 pr-12 py-3 bg-gray-50 border-2 focus:bg-white focus:border-purple-500 transition-colors"
+                  required
                 />
                 <button
                   type="button"
@@ -152,44 +150,15 @@ export const LoginPage = () => {
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-              )}
-            </div>
-
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="remember"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                />
-                <Label
-                  htmlFor="remember"
-                  className="text-sm text-gray-600 cursor-pointer"
-                >
-                  Remember me
-                </Label>
-              </div>
-              <Button
-                type="button"
-                variant="link"
-                className="text-sm text-purple-600 hover:text-purple-800 p-0 h-auto font-medium"
-                onClick={() => navigate("/forgot-password")}
-              >
-                Forgot password?
-              </Button>
             </div>
 
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 mt-6 hover:from-purple-700 hover:to-blue-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 mt-6 hover:from-purple-700 hover:to-blue-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In
+              {isLoading ? "Signing In..." : "Sign In"}
             </Button>
           </form>
 
@@ -203,7 +172,7 @@ export const LoginPage = () => {
               className="text-sm text-purple-600 hover:text-purple-800 font-medium p-0"
               onClick={() => navigate("/register")}
             >
-              Sign Up
+              Create Account
             </Button>
           </div>
         </div>
@@ -211,3 +180,5 @@ export const LoginPage = () => {
     </div>
   );
 };
+
+export default LoginPage;

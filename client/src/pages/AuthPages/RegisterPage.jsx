@@ -1,94 +1,105 @@
-import React from "react";
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import PasswordStrengthChecker from "@/utils/PasswordStrengthChecker";
-import { Eye, EyeOff, User, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, User, Mail, Lock, AlertCircle } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const { register, isAuthenticated, isLoading: authLoading } = useAuth();
+  
   const [formData, setFormData] = useState({
-    fullName: "",
+    name: "",
     email: "",
     password: "",
     confirmPassword: "",
+    bio: ""
   });
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, authLoading, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-    // Clear error when user starts typing
+    // Clear specific field error when user starts typing
     if (errors[name]) {
-      setErrors({
-        ...errors,
-        [name]: "",
-      });
+      setErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
     }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = "Full name is required";
+    
+    // Clear general error when user makes changes
+    if (errors.general) {
+      setErrors(prev => ({
+        ...prev,
+        general: ""
+      }));
     }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Email is invalid";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters";
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords don't match";
-    }
-
-    return newErrors;
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  const newErrors = validateForm();
-  
-  if (Object.keys(newErrors).length > 0) {
-    setErrors(newErrors);
-    return;
+    e.preventDefault();
+    setIsLoading(true);
+    setErrors({}); // Clear all previous errors
+
+    try {
+      const result = await register(formData);
+      
+      if (!result.success) {
+        // ✅ Safe error handling - ensure errors object exists
+        const newErrors = {};
+        
+        if (result.errors) {
+          Object.assign(newErrors, result.errors);
+        }
+        
+        if (result.message && !newErrors.general) {
+          newErrors.general = result.message;
+        }
+        
+        setErrors(newErrors);
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+      setErrors({ 
+        general: "Something went wrong. Please try again." 
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show loading spinner while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl">
+          <div className="flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+            <span className="text-gray-700">Loading...</span>
+          </div>
+        </div>
+      </div>
+    );
   }
-  
-  console.log("Form submitted:", formData);
-  
-  // Simulate API call to create account and send OTP
-  try {
-    // Add your registration API call here
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Navigate to OTP verification with email
-    navigate('/otp-verification', { 
-      state: { email: formData.email }
-    });
-    
-  } catch (error) {
-    console.error('Registration failed:', error);
-    // Handle registration error
-  }
-};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center p-4">
@@ -101,42 +112,65 @@ const RegisterPage = () => {
 
         {/* Form */}
         <div className="p-6">
+          {/* ✅ Error Display at Top of Form */}
+          {(errors?.general || Object.keys(errors).length > 0) && (
+            <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-400 rounded-lg">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">
+                    Registration Failed
+                  </h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    {errors.general && (
+                      <p className="mb-1">{errors.general}</p>
+                    )}
+                    {errors.name && (
+                      <p className="mb-1">• {errors.name}</p>
+                    )}
+                    {errors.email && (
+                      <p className="mb-1">• {errors.email}</p>
+                    )}
+                    {errors.password && (
+                      <p className="mb-1">• {errors.password}</p>
+                    )}
+                    {errors.confirmPassword && (
+                      <p className="mb-1">• {errors.confirmPassword}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Full Name Field */}
             <div>
-              <Label
-                htmlFor="fullName"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
+              <Label htmlFor="name" className="text-sm font-medium text-gray-700 mb-1 block">
                 Full Name
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   type="text"
-                  id="fullName"
-                  name="fullName"
-                  value={formData.fullName}
+                  id="name"
+                  name="name"
+                  value={formData.name}
                   onChange={handleChange}
                   placeholder="Enter your full name"
                   className={`pl-10 py-3 bg-gray-50 border-2 focus:bg-white transition-colors ${
-                    errors.fullName
+                    errors.name
                       ? "border-red-300 focus:border-red-500"
                       : "border-gray-200 focus:border-purple-500"
                   }`}
+                  required
                 />
               </div>
-              {errors.fullName && (
-                <p className="text-red-500 text-xs mt-1">{errors.fullName}</p>
-              )}
             </div>
 
             {/* Email Field */}
             <div>
-              <Label
-                htmlFor="email"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
+              <Label htmlFor="email" className="text-sm font-medium text-gray-700 mb-1 block">
                 Email Address
               </Label>
               <div className="relative">
@@ -153,19 +187,14 @@ const RegisterPage = () => {
                       ? "border-red-300 focus:border-red-500"
                       : "border-gray-200 focus:border-purple-500"
                   }`}
+                  required
                 />
               </div>
-              {errors.email && (
-                <p className="text-red-500 text-xs mt-1">{errors.email}</p>
-              )}
             </div>
 
             {/* Password Field */}
             <div>
-              <Label
-                htmlFor="password"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
+              <Label htmlFor="password" className="text-sm font-medium text-gray-700 mb-1 block">
                 Password
               </Label>
               <div className="relative">
@@ -182,6 +211,7 @@ const RegisterPage = () => {
                       ? "border-red-300 focus:border-red-500"
                       : "border-gray-200 focus:border-purple-500"
                   }`}
+                  required
                 />
                 <button
                   type="button"
@@ -195,9 +225,6 @@ const RegisterPage = () => {
                   )}
                 </button>
               </div>
-              {errors.password && (
-                <p className="text-red-500 text-xs mt-1">{errors.password}</p>
-              )}
             </div>
 
             {/* Password Strength Checker */}
@@ -207,10 +234,7 @@ const RegisterPage = () => {
 
             {/* Confirm Password Field */}
             <div>
-              <Label
-                htmlFor="confirmPassword"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
+              <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700 mb-1 block">
                 Confirm Password
               </Label>
               <div className="relative">
@@ -227,6 +251,7 @@ const RegisterPage = () => {
                       ? "border-red-300 focus:border-red-500"
                       : "border-gray-200 focus:border-purple-500"
                   }`}
+                  required
                 />
                 <button
                   type="button"
@@ -240,19 +265,15 @@ const RegisterPage = () => {
                   )}
                 </button>
               </div>
-              {errors.confirmPassword && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.confirmPassword}
-                </p>
-              )}
             </div>
 
             {/* Submit Button */}
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 mt-6 hover:from-purple-700 hover:to-blue-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg"
+              disabled={isLoading}
+              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 mt-6 hover:from-purple-700 hover:to-blue-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Account
+              {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
 
