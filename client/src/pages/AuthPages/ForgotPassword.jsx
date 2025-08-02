@@ -1,9 +1,16 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Mail, ArrowLeft, KeyRound } from "lucide-react";
+import { Zap, ArrowLeft } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -42,102 +49,66 @@ const ForgotPassword = () => {
         state: { email: email },
       });
     } catch (error) {
-      setError("Failed to send reset code. Please try again.");
+      setError("Failed to send reset code. Please try again.", error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md shadow-2xl rounded-2xl overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-center">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
           <div className="flex items-center justify-between mb-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate("/login")}
-              className="text-white hover:bg-white/20 p-2"
+              className="p-2"
             >
               <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h1 className="text-xl font-bold text-white">Reset Password</h1>
-            <div className="w-8" /> {/* Spacer */}
+            <div className="flex items-center justify-center w-12 h-12 bg-primary rounded-xl">
+              <Zap className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <div className="w-10" />
           </div>
-
-          <div className="bg-white/20 rounded-full p-3 inline-block mb-3">
-            <KeyRound className="h-6 w-6 text-white" />
-          </div>
-
-          <p className="text-purple-100 text-sm">
+          <CardTitle className="text-2xl">Forgot password?</CardTitle>
+          <CardDescription>
             Enter your email to receive a reset code
-          </p>
-        </div>
-
-        {/* Form */}
-        <div className="p-6">
-          <div className="text-center mb-6">
-            <p className="text-gray-600 text-sm">
-              We'll send you a 6-digit verification code to reset your password
-            </p>
-          </div>
-
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email Field */}
-            <div>
-              <Label
-                htmlFor="email"
-                className="text-sm font-medium text-gray-700 mb-1 block"
-              >
-                Email Address
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError("");
-                  }}
-                  placeholder="Enter your registered email"
-                  className={`pl-10 py-3 bg-gray-50 border-2 focus:bg-white transition-colors ${
-                    error
-                      ? "border-red-300 focus:border-red-500"
-                      : "border-gray-200 focus:border-purple-500"
-                  }`}
-                />
-              </div>
-              {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError("");
+                }}
+                required
+              />
+              {error && <p className="text-sm text-red-500">{error}</p>}
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 mt-6 hover:from-purple-700 hover:to-blue-700 transition-all duration-200 transform hover:scale-[1.02] shadow-lg disabled:opacity-50 disabled:transform-none"
-            >
-              {isLoading ? "Sending Code..." : "Send Reset Code"}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Sending code..." : "Send reset code"}
             </Button>
           </form>
 
-          {/* Back to Login */}
-          <div className="mt-6 text-center">
-            <span className="text-sm text-gray-500">
-              Remember your password?{" "}
-            </span>
-            <Button
-              variant="link"
-              className="text-sm text-purple-600 hover:text-purple-800 font-medium p-0"
-              onClick={() => navigate("/login")}
-            >
-              Sign In
-            </Button>
+          <div className="text-center text-sm">
+            Remember your password?{" "}
+            <Link to="/login" className="text-primary hover:underline">
+              Sign in
+            </Link>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
