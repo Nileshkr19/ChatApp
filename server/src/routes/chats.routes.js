@@ -14,7 +14,8 @@ router.use(authMiddleware);
 
 // Chat routes
 
-router.route("/").post(createChat).get(getUserChats);
+router.route("/").post(createChat)
+router.route("/user/:userId").get(getUserChats);
 router.route("/:chatId").get(getChatById);
 router.route("/:chatId").delete(deleteChat);
 

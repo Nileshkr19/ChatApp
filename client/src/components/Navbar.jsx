@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 
-import { useAuth } from "@/hooks/useAuth";
 
 export const Navbar = ({ title }) => {
   // Dynamic icon based on title
@@ -51,10 +50,6 @@ export const Navbar = ({ title }) => {
     }
   };
 
-  const { logout } = useAuth();
-  const handleLogout = () => {
-    logout();
-  };
 
   return (
     <header className="h-16 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -143,7 +138,7 @@ export const Navbar = ({ title }) => {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="text-red-600" 
-                onClick={handleLogout}>
+                onClick>
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </DropdownMenuItem>

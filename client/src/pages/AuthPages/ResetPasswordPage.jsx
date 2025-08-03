@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import PasswordStrengthChecker from "@/utils/PasswordStrengthChecker";
+import PasswordStrengthChecker from "@/components/PasswordStrengthChecker";
 import { Eye, EyeOff, Zap, ArrowLeft } from "lucide-react";
 import {
   Card,
@@ -94,7 +94,10 @@ const ResetPasswordPage = () => {
         },
       });
     } catch (error) {
-      setErrors({ general: "Failed to reset password. Please try again.", error });
+      setErrors({
+        general: "Failed to reset password. Please try again.",
+        error,
+      });
     } finally {
       setIsLoading(false);
     }

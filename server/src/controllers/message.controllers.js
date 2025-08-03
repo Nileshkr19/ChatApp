@@ -161,6 +161,74 @@ export const getMessages = asyncHandler(async (req, res) => {
   );
 });
 
+export const getAllMessagesInChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+  const { cursor, limit = 20 } = req.query;
+
+  // Verify user is participant
+  const chat = await prisma.chat.findFirst({
+    where: {
+      id: chatId,
+      isDeleted: false,
+      participants: {
+        some: { userId },
+      },
+    },
+  });
+
+  if (!chat) {
+    throw new ApiError(404, "Chat not found or you're not a participant");
+  }
+
+  // Fetch messages
+  const messages = await prisma.message.findMany({
+    where: {
+      chatId,
+      isDeleted: false,
+    },
+    include: {
+      sender: {
+        select: { id: true, name: true, profileImage: true },
+      },
+      readBy: {
+        include: {
+          user: { select: { id: true, name: true } },
+        },
+      },
+      messageReactions: {
+        include: {
+          user: { select: { id: true, name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: parseInt(limit) + 1, // fetch one extra to detect if there's more
+    ...(cursor && {
+      cursor: { id: cursor },
+      skip: 1, // skip the cursor itself
+    }),
+  });
+
+  let nextCursor = null;
+  if (messages.length > limit) {
+    const nextItem = messages.pop();
+    nextCursor = nextItem.id;
+  }
+
+  return res.status(200).json(
+    new ApiResponse(200, {
+      messages: messages.reverse(), // Show oldest first
+      nextCursor,
+      pagination: {
+        limit: parseInt(limit),
+        hasMore: nextCursor !== null,
+      },
+    }, "Messages retrieved successfully")
+  );
+});
+
+
 // Mark message as read
 export const markMessageAsRead = asyncHandler(async (req, res) => {
   const { messageId } = req.params;

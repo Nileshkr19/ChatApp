@@ -1,109 +1,98 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import PasswordStrengthChecker from "@/utils/PasswordStrengthChecker";
-import { Eye, EyeOff, User, Mail, Lock, AlertCircle } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import PasswordStrengthChecker from "@/components/PasswordStrengthChecker";
+import { Eye, EyeOff, AlertCircle, Zap } from "lucide-react";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Link } from "react-router-dom";
-import { Zap } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useRegisterMutation } from "@/features/auth/authApiSlice";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
-  const { register, isAuthenticated, isLoading: authLoading } = useAuth();
-  
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    bio: ""
+    bio: "",
   });
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      navigate('/dashboard', { replace: true });
-    }
-  }, [isAuthenticated, authLoading, navigate]);
+  const [register, { isLoading }] = useRegisterMutation();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
 
     // Clear specific field error when user starts typing
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: ""
+        [name]: "",
       }));
     }
-    
+
     // Clear general error when user makes changes
     if (errors.general) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        general: ""
+        general: "",
       }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setErrors({}); // Clear all previous errors
 
     try {
-      const result = await register(formData);
-      
-      if (!result.success) {
-        // ✅ Safe error handling - ensure errors object exists
-        const newErrors = {};
-        
-        if (result.errors) {
-          Object.assign(newErrors, result.errors);
-        }
-        
-        if (result.message && !newErrors.general) {
-          newErrors.general = result.message;
-        }
-        
-        setErrors(newErrors);
+      const res = await register(formData).unwrap();
+      console.log("Register response:", res);
+
+      if (res.success) {
+        console.log("Registration successful, navigating now...");
+        // Add a small delay to ensure cookie is set
+        setTimeout(() => {
+          navigate("/dashboard", { replace: true });
+        }, 100);
+      } else {
+        console.log("Registration failed, response.success is false");
       }
     } catch (error) {
       console.error("Registration error:", error);
-      setErrors({ 
-        general: "Something went wrong. Please try again." 
-      });
-    } finally {
-      setIsLoading(false);
+      if (error.data && error.data.errors) {
+        setErrors(error.data.errors);
+      } else {
+        setErrors({
+          general: "An unexpected error occurred. Please try again.",
+        });
+      }
     }
   };
 
-  // Show loading spinner while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl">
-          <div className="flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
-            <span className="text-gray-700">Loading...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleGoogleRegister = () => {
+    setIsGoogleLoading(true);
+    setTimeout(() => {
+      setIsGoogleLoading(false);
+      console.log("Mock Google registration");
+      navigate("/chat");
+    }, 1000);
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800 p-4">
@@ -120,40 +109,64 @@ const RegisterPage = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Error Display */}
+          {errors.general && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-start">
+                <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" />
+                <div className="ml-3">
+                  <p className="text-sm text-red-700">{errors.general}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
+                name="name"
                 type="text"
                 placeholder="John Doe"
                 value={formData.name}
                 onChange={handleChange}
+                className={errors.name ? "border-red-500" : ""}
                 required
               />
+              {errors.name && (
+                <p className="text-sm text-red-600">{errors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
+                name="email"
                 type="email"
                 placeholder="john@example.com"
                 value={formData.email}
                 onChange={handleChange}
+                className={errors.email ? "border-red-500" : ""}
                 required
               />
+              {errors.email && (
+                <p className="text-sm text-red-600">{errors.email}</p>
+              )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
                 <Input
                   id="password"
-                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
                   value={formData.password}
                   onChange={handleChange}
+                  className={errors.password ? "border-red-500" : ""}
                   required
                 />
                 <Button
@@ -171,11 +184,8 @@ const RegisterPage = () => {
                 </Button>
               </div>
               <PasswordStrengthChecker password={formData.password} />
-              {formData.password && formData.password.length < 6 && (
-                <p className="text-xs text-red-500">Password must be at least 6 characters</p>
-              )}
               {errors.password && (
-                <p className="text-xs text-red-500">{errors.password}</p>
+                <p className="text-sm text-red-600">{errors.password}</p>
               )}
             </div>
 
@@ -184,10 +194,12 @@ const RegisterPage = () => {
               <div className="relative">
                 <Input
                   id="confirmPassword"
-                  type={showConfirmPassword ? 'text' : 'password'}
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
                   placeholder="Confirm your password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
+                  className={errors.confirmPassword ? "border-red-500" : ""}
                   required
                 />
                 <Button
@@ -204,13 +216,17 @@ const RegisterPage = () => {
                   )}
                 </Button>
               </div>
-              {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                <p className="text-xs text-red-500">Passwords do not match</p>
+              {formData.confirmPassword &&
+                formData.password !== formData.confirmPassword && (
+                  <p className="text-sm text-red-600">Passwords do not match</p>
+                )}
+              {errors.confirmPassword && (
+                <p className="text-sm text-red-600">{errors.confirmPassword}</p>
               )}
             </div>
 
-            <Button type="submit" className="w-full">
-              Create Account
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Creating Account..." : "Create Account"}
             </Button>
           </form>
 
@@ -225,7 +241,12 @@ const RegisterPage = () => {
             </div>
           </div>
 
-          <Button variant="outline" className="w-full">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleRegister}
+            disabled={isLoading}
+          >
             <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -244,11 +265,11 @@ const RegisterPage = () => {
                 fill="#EA4335"
               />
             </svg>
-            Register with Google
+            {isLoading ? "Registering..." : "Register with Google"}
           </Button>
 
           <div className="text-center text-sm">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link to="/login" className="text-primary hover:underline">
               Sign in
             </Link>

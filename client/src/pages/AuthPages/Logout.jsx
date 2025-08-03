@@ -1,26 +1,44 @@
-import React from 'react'
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { LogOut } from 'lucide-react';
+import React from "react";
+import { LogOut } from "lucide-react";
+import { useLogoutMutation } from "@/features/auth/authApiSlice";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { logout as logoutAction } from "@/features/auth/authSlice";
 
-export const LogoutButton = () => {
-    const { logout } = useAuth();
-    const navigate = useNavigate();
+export const LogoutButton = ({
+  className = "",
+  showIcon = true,
+  showText = true,
+}) => {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const [logout, { isLoading }] = useLogoutMutation();
 
-    const handleLogout = async () => {
-        const result = await logout();
-        if (result.success) {
-            navigate('/login');
-        } else {
-            console.error("Logout failed");
-        }
+  const handleLogout = async () => {
+    try {
+      await logout().unwrap();
+
+      // Clear Redux state
+      dispatch(logoutAction());
+
+      console.log("Logout successful");
+      navigate("/login", { replace: true });
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Even if API call fails, clear local state and redirect
+      dispatch(logoutAction());
+      navigate("/login", { replace: true });
     }
+  };
 
   return (
-   <button onClick={handleLogout} className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 cursor-pointer">
-        <LogOut className="h-4 w-4" />
-        <span>Logout</span>
-   </button>
-  )
-}
-
+    <div
+      className={`flex items-center cursor-pointer ${className}`}
+      onClick={handleLogout}
+    >
+      {showIcon && <LogOut className="h-4 w-4" />}
+      {showIcon && showText && <span className="ml-2" />}
+      {showText && <span>Logout</span>}
+    </div>
+  );
+};

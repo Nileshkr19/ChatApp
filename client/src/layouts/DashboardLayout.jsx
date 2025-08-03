@@ -15,7 +15,7 @@ const MainLayout = ({ children, title }) => {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Navbar title={title} />
         <main className="flex-1 overflow-y-auto">
-          <Outlet />
+         {children || <Outlet />}
         </main>
       </div>
     </div>

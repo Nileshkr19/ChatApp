@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/toggle-theme";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
+import { LogoutButton } from "@/pages/AuthPages/Logout";
+
 
 const navigationItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -51,10 +52,6 @@ const Sidebar = ({ collapsed, onToggle })=> {
     return false;
   };
 
-  const {logout} = useAuth();
-  const handleLogout = () => {
-    logout();
-  };
   return (
     <div
       className={cn(
@@ -156,10 +153,9 @@ const Sidebar = ({ collapsed, onToggle })=> {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" 
-              onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
+            <DropdownMenuItem className="text-destructive"  asChild
+             >
+              <LogoutButton className="w-full"/>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
