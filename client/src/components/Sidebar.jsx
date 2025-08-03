@@ -114,7 +114,7 @@ const Sidebar = ({ collapsed, onToggle })=> {
       <div className="border-t p-4 space-y-4">
         {!collapsed && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Theme</span>
+            <span className="text-sm text-muted-foreground"></span>
             <ThemeToggle />
           </div>
         )}

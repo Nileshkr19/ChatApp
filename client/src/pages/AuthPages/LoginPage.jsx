@@ -13,8 +13,6 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useLoginMutation } from "@/features/auth/authApiSlice";
-import { useDispatch } from "react-redux";
-
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -45,21 +43,39 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrors({}); // Clear previous errors
+
     try {
       const res = await login(formData).unwrap();
       console.log("Login response:", res);
 
       if (res.success) {
         console.log("Login successful, navigating now...");
-        // Add a small delay to ensure cookie is set
         setTimeout(() => {
           navigate("/dashboard", { replace: true });
         }, 100);
       } else {
-        console.log("Login failed, response.success is false");
+        setErrors({
+          general: res.message || "Login failed. Please try again.",
+        });
       }
     } catch (error) {
       console.error("Login error:", error);
+
+      // Extract error message from the response
+      const errorMessage =
+        error.message ||
+        error.data?.message ||
+        "Invalid email or password. Please try again.";
+
+      // Check if it's a validation error with specific field errors
+      if (error.errors || error.data?.errors) {
+        setErrors(error.data.errors);
+      } else {
+        setErrors({
+          general: errorMessage,
+        });
+      }
     }
   };
 
