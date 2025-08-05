@@ -90,76 +90,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     .json(new ApiResponse(201, { message }, "Message sent successfully"));
 });
 
-// Get messages for a chat with pagination
-export const getMessages = asyncHandler(async (req, res) => {
-  const { chatId } = req.params;
-  const { page = 1, limit = 50 } = req.query;
-  const userId = req.user.id;
 
-  // Verify user is participant in this chat
-  const chat = await prisma.chat.findFirst({
-    where: {
-      id: chatId,
-      isDeleted: false,
-      participants: {
-        some: { userId },
-      },
-    },
-  });
-
-  if (!chat) {
-    throw new ApiError(404, "Chat not found or you're not a participant");
-  }
-
-  const skip = (page - 1) * limit;
-  const messages = await prisma.message.findMany({
-    where: {
-      chatId,
-      isDeleted: false, // Only show non-deleted messages
-    },
-    include: {
-      sender: {
-        select: {
-          id: true,
-          name: true,
-          profileImage: true,
-        },
-      },
-      readBy: {
-        include: {
-          user: {
-            select: { id: true, name: true },
-          },
-        },
-      },
-      messageReactions: {
-        include: {
-          user: {
-            select: { id: true, name: true },
-          },
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    skip: parseInt(skip),
-    take: parseInt(limit),
-  });
-
-  return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        messages: messages.reverse(), // Show oldest first
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          hasMore: messages.length === parseInt(limit),
-        },
-      },
-      "Messages retrieved successfully"
-    )
-  );
-});
 
 export const getAllMessagesInChat = asyncHandler(async (req, res) => {
   const { chatId } = req.params;

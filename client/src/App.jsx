@@ -1,22 +1,17 @@
-import React, { useEffect } from "react";
+import React from "react";
 import AppRoutes from "./Routes/AppRoutes";
-import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./context/ThemeProvider.jsx";
-import { Provider } from "react-redux";
-import {store} from "./app/store.js";
+import { BrowserRouter as Router } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
 
 
 const App = () => {
-  
-
+ 
   return (
-    <Provider store={store}>
-    <ThemeProvider defaultTheme="dark" storageKey="chatflow-ui-theme">
-      <ErrorBoundary>
+    <AuthProvider>
+      <Router>
         <AppRoutes />
-      </ErrorBoundary>
-    </ThemeProvider>
-    </Provider>
+      </Router>
+    </AuthProvider>
   );
 };
 export default App;

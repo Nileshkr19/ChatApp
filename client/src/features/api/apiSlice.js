@@ -1,6 +1,6 @@
 import {createApi,fetchBaseQuery} from '@reduxjs/toolkit/query/react';
 import {Mutex} from 'async-mutex';
-import { setAccessToken, logout } from '../auth/authSlice';
+import {  logout } from '../auth/authSlice';
 
 const mutex = new Mutex();
 

@@ -14,23 +14,27 @@ datasource db {
 }
 
 model User {
-  id               String             @id @default(cuid())
-  name             String
-  email            String             @unique
-  password         String
-  profileImage     String?
-  bio              String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  isOnline         Boolean            @default(false)
-  lastSeen         DateTime?
-  refreshTokens    RefreshToken[]
-  sentMessages     Message[]
-  chats            ChatParticipants[]
-  messageReactions MessageReaction[]
-  notifications    Notification[]
-  messageReads     MessageRead[]
-  createdChats     Chat[]             @relation("ChatCreator")
+  id                 String             @id @default(cuid())
+  name               String
+  email              String             @unique
+  password           String
+  profileImage       String?
+  bio                String?
+  isVerified         Boolean            @default(false)
+  otp                String?
+  otpExpiresAt       DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  isOnline           Boolean            @default(false)
+  lastSeen           DateTime?
+  room               Room[]
+  refreshTokens      RefreshToken[]
+  roomsMember        RoomMember[]
+  roomMessages       RoomMessage[]
+  roomMessageReplies RoomMessageReply[]
+  messageReactions   MessageReaction[]
+
+  notifications Notification[]
 }
 
 model RefreshToken {
@@ -43,74 +47,90 @@ model RefreshToken {
   isRevoked Boolean  @default(false)
 }
 
-model Message {
-  id               String            @id @default(cuid())
-  senderId         String
-  content          String
-  messageType      String            @default("text") // text, image, file, etc.
-  fileUrl          String? // For file/image messages
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  sender           User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  chatId           String
-  chat             Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  readBy           MessageRead[]
-  isEdited         Boolean           @default(false)
-  isDeleted        Boolean           @default(false) // Soft delete
-  messageReactions MessageReaction[]
-
-  @@index([chatId, createdAt])
+enum RoomVisibility {
+  PUBLIC
+  PRIVATE
+  INVITE_ONLY
 }
 
-model Chat {
-  id            String             @id @default(cuid())
-  name          String? // For group chats
-  type          String             @default("private") // private, group
-  participants  ChatParticipants[]
-  messages      Message[]
-  lastMessageAt DateTime?
-  createdBy     String?
-  creator       User?              @relation("ChatCreator", fields: [createdBy], references: [id])
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  isDeleted     Boolean            @default(false) // Soft delete
-
-  @@index([updatedAt])
+model Room {
+  id             String         @id @default(cuid())
+  name           String
+  roomImage      String?
+  description    String?
+  createdBy      User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  roomCode       String         @unique
+  hashedPassword String?
+  isPrivate      RoomVisibility @default(PUBLIC)
+  ownerId        String
+  isDeleted      Boolean        @default(false)
+  roomMembers    RoomMember[]
+  messages       RoomMessage[]
 }
 
-model MessageRead {
-  id        String   @id @default(cuid())
-  messageId String
-  userId    String
-  readAt    DateTime @default(now())
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([messageId, userId])
+enum ParticipantRole {
+  ADMIN
+  MEMBER
 }
 
-model ChatParticipants {
-  id       String   @id @default(cuid())
-  chatId   String
+model RoomMember {
+  id       String          @id @default(cuid())
   userId   String
-  joinedAt DateTime @default(now())
-  role     String   @default("member") // member, admin, owner
-  chat     Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roomId   String
+  room     Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  role     ParticipantRole
+  joinedAt DateTime        @default(now())
+}
 
-  @@unique([chatId, userId])
+model RoomMessage {
+  id        String   @id @default(cuid())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  isEdited         Boolean            @default(false)
+  isDeleted        Boolean            @default(false)
+  messageReactions MessageReaction[]
+  attachments      FileAttachment[]
+  replies          RoomMessageReply[]
 }
 
 model MessageReaction {
-  id        String   @id @default(cuid())
-  messageId String
-  userId    String
-  type      String // e.g. "like", "love", "laugh", etc.
-  createdAt DateTime @default(now())
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  roomMessageId String
+  roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+  emoji         String // e.g. "like", "love", etc.
+  createdAt     DateTime    @default(now())
 
-  @@unique([messageId, userId])
+  @@unique([roomMessageId, userId])
+}
+
+model FileAttachment {
+  id            String      @id @default(cuid())
+  roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
+  roomMessageId String
+  fileUrl       String
+  fileType      String // e.g. "image", "video", "document", etc.
+  createdAt     DateTime    @default(now())
+}
+
+model RoomMessageReply {
+  id            String      @id @default(cuid())
+  roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
+  roomMessageId String
+  sender        User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  senderId      String
+  content       String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model Notification {

@@ -22,12 +22,12 @@ export function createTestUsers() {
   let userId1, userId2;
 
   return cy
-    .request("POST", "/api/v1/users/register", user1)
+    .request("POST", "/api/v1/auth/register", user1)
     .then((res1) => {
       expect(res1.status).to.eq(201);
       userId1 = res1.body.data.user.id;
 
-      return cy.request("POST", "/api/v1/users/register", user2);
+      return cy.request("POST", "/api/v1/auth/register", user2);
     })
     .then((res2) => {
       expect(res2.status).to.eq(201);
@@ -45,7 +45,7 @@ export function createTestUsers() {
  */
 export function createChat(user1, userId2) {
   return cy
-    .request("POST", "/api/v1/users/login", {
+    .request("POST", "/api/v1/auth/login", {
       email: user1.email,
       password: user1.password,
     })
@@ -72,7 +72,7 @@ export function createChat(user1, userId2) {
  */
 export function loginUser(user) {
   return cy
-    .request("POST", "/api/v1/users/login", {
+    .request("POST", "/api/v1/auth/login", {
       email: user.email,
       password: user.password,
     })
@@ -96,7 +96,7 @@ export function createSingleTestUser(namePrefix = "Test User") {
     bio: "Automated test user",
   };
 
-  return cy.request("POST", "/api/v1/users/register", user).then((res) => {
+  return cy.request("POST", "/api/v1/auth/register", user).then((res) => {
     expect(res.status).to.eq(201);
     return { user, userId: res.body.data.user.id, response: res };
   });
@@ -110,7 +110,7 @@ export function createSingleTestUser(namePrefix = "Test User") {
 export function registerUser(user) {
   return cy.request({
     method: "POST",
-    url: "/api/v1/users/register",
+    url: "/api/v1/auth/register",
     body: user,
     failOnStatusCode: false,
   });
@@ -125,8 +125,107 @@ export function registerUser(user) {
 export function loginWithCredentials(email, password) {
   return cy.request({
     method: "POST",
-    url: "/api/v1/users/login",
+    url: "/api/v1/auth/login",
     body: { email, password },
+    failOnStatusCode: false,
+  });
+}
+
+/**
+ * Registers a user for OTP testing (returns user data with registration response)
+ * @param {Object} userData - User data to register
+ * @returns {Object} Object containing user data and registration response
+ */
+export function registerUserForOtpTest(userData = null) {
+  const timestamp = Date.now();
+  const user = userData || {
+    name: "OTP Test User",
+    email: `otptest_${timestamp}@example.com`,
+    password: "Test@1234",
+    bio: "User for OTP testing",
+  };
+
+  return cy
+    .request({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      body: user,
+      failOnStatusCode: false,
+    })
+    .then((res) => {
+      return { user, response: res };
+    });
+}
+
+/**
+ * Verify OTP for a user
+ * @param {string} email - User email
+ * @param {string} otp - OTP code
+ * @returns {Object} OTP verification response
+ */
+export function verifyOtp(email, otp) {
+  return cy.request({
+    method: "POST",
+    url: "/api/v1/auth/verify-otp",
+    body: { email, otp },
+    failOnStatusCode: false,
+  });
+}
+
+/**
+ * Creates a verified user (registers and simulates OTP verification)
+ * @param {Object} userData - User data to register
+ * @returns {Object} Object containing user data and userId
+ */
+export function createVerifiedUser(userData = null) {
+  const timestamp = Date.now();
+  const user = userData || {
+    name: "Verified Test User",
+    email: `verified_${timestamp}@example.com`,
+    password: "Test@1234",
+    bio: "Verified test user",
+  };
+
+  return cy
+    .request({
+      method: "POST",
+      url: "/api/v1/auth/register",
+      body: user,
+    })
+    .then((res) => {
+      expect(res.status).to.eq(201);
+
+      // In a real scenario, you would get the OTP from the database or mock email service
+      // For now, we'll just return the user data
+      return { user, userId: res.body.data.user.id, response: res };
+    });
+}
+
+/**
+ * Login user with auth endpoints
+ * @param {Object} user - User credentials
+ * @returns {Object} Login response
+ */
+export function loginUserAuth(user) {
+  return cy.request({
+    method: "POST",
+    url: "/api/v1/auth/login",
+    body: {
+      email: user.email,
+      password: user.password,
+    },
+    failOnStatusCode: false,
+  });
+}
+
+/**
+ * Logout user with auth endpoints
+ * @returns {Object} Logout response
+ */
+export function logoutUserAuth() {
+  return cy.request({
+    method: "POST",
+    url: "/api/v1/auth/logout",
     failOnStatusCode: false,
   });
 }

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import {
   sendMessage,
-  getMessages,
   getAllMessagesInChat,
   markMessageAsRead,
   editMessage,
@@ -17,7 +16,6 @@ router.use(authMiddleware);
 
 // Message routes
 router.route("/").post(sendMessage);
-router.route("/:chatId").get(getMessages);
 router.route("/all/:chatId").get(getAllMessagesInChat);
 router.route("/:messageId/read").post(markMessageAsRead);
 router.route("/:messageId/edit").put(editMessage);

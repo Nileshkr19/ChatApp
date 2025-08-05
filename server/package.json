@@ -8,30 +8,34 @@
     "dev": "nodemon index.js",
     "cy:open": "cypress open",
     "cy:run": "cypress run",
-    "cy:test": "start-server-and-test dev http://localhost:5000 cy:run"
+    "cy:test": "start-server-and-test dev http://localhost:5000 cy:run",
+    "test": "cypress run",
+    "test:auth": "cypress run --spec 'cypress/e2e/auth.controller.test.cy.js'"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "^6.12.0",
+    "@prisma/client": "^6.13.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
+    "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "ms": "^2.1.3",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
+    "nodemailer": "^7.0.5",
     "nodemon": "^3.1.10",
-    "prisma": "^6.12.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "cypress": "^14.5.3",
+    "prisma": "^6.13.0",
     "start-server-and-test": "^2.0.12"
   }
 }
