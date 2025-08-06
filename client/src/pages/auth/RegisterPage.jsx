@@ -1,65 +1,78 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { FormWrapper } from '@/components/FormWrapper';
-import { InputField } from '@/components/InputField';
-import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { Toast } from '@/components/Toast';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { FormWrapper } from "@/components/FormWrapper";
+import { InputField } from "@/components/InputField";
+import { PasswordStrengthMeter } from "@/components/PasswordStrengthMeter";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { Toast } from "@/components/Toast";
+
+import { registerUser } from "@/features/auth/authSlice";
 
 export const RegisterPage = () => {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    bio: '',
-    profileImage: '',
+    name: "",
+    email: "",
+    password: "",
+    bio: "",
   });
-  const [showPassword, setShowPassword] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  
-  const { register, isLoading, error, clearError } = useAuth();
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (error) {
-      setShowToast(true);
-    }
-  }, [error]);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [toastInfo, setToastInfo] = useState({ show: false, message: '', type: 'error' });
+
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  
+  const { loading: isLoading, error: apiError } = useSelector((state) => state.auth);
 
   const handleChange = (e) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
+    const { name, value } = e.target;
+    setFormData((prevData) => ({
+      ...prevData,
+      [name]: value,
     }));
   };
 
-  const handleSubmit = async (e) => {
+  // Handler for the file input
+  const handleFileChange = (e) => {
+    setProfileImageFile(e.target.files[0]);
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    clearError();
-    
-    await register(formData);
-    
-    if (!error) {
-      setSuccessMessage('Registration successful! Please check your email for OTP verification.');
-      setShowToast(true);
-      setTimeout(() => {
-        navigate('/verify-otp', { 
-          state: { email: formData.email, type: 'register' } 
-        });
-      }, 2000);
+
+    const dataToSend = new FormData();
+    dataToSend.append('name', formData.name);
+    dataToSend.append('email', formData.email);
+    dataToSend.append('password', formData.password);
+    dataToSend.append('bio', formData.bio);
+    if (profileImageFile) {
+      dataToSend.append('profileImage', profileImageFile);
     }
+
+    dispatch(registerUser(dataToSend))
+      .unwrap()
+      .then(() => {
+       
+        navigate('/verify-otp', { state: { email: formData.email, type: 'register' } });
+      })
+      .catch((err) => {
+      
+        setToastInfo({ show: true, message: err.message || 'Registration failed', type: 'error' });
+      });
   };
 
   return (
     <>
-      <FormWrapper 
-        title="Create Account" 
+      <FormWrapper
+        title="Create Account"
         subtitle="Join us today"
         className="max-w-lg"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* ... other InputFields for name, email, password ... */}
           <InputField
             label="Full Name"
             name="name"
@@ -68,7 +81,6 @@ export const RegisterPage = () => {
             placeholder="Enter your full name"
             required
           />
-          
           <InputField
             label="Email Address"
             name="email"
@@ -78,11 +90,10 @@ export const RegisterPage = () => {
             placeholder="Enter your email"
             required
           />
-          
           <InputField
             label="Password"
             name="password"
-            type={showPassword ? 'text' : 'password'}
+            type={showPassword ? "text" : "password"}
             value={formData.password}
             onChange={handleChange}
             placeholder="Create a strong password"
@@ -91,9 +102,7 @@ export const RegisterPage = () => {
             onTogglePassword={() => setShowPassword(!showPassword)}
             required
           />
-
           <PasswordStrengthMeter password={formData.password} />
-
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
               Bio (Optional)
@@ -108,14 +117,13 @@ export const RegisterPage = () => {
                        transition-all duration-200 bg-white placeholder-gray-400 resize-none"
             />
           </div>
-
-          <InputField
-            label="Profile Image URL (Optional)"
+          {/* Changed to file input */}
+           <InputField
+            label="Profile Image (Optional)"
             name="profileImage"
-            type="url"
-            value={formData.profileImage}
-            onChange={handleChange}
-            placeholder="https://example.com/avatar.jpg"
+            type="file"
+            onChange={handleFileChange}
+            accept="image/*"
           />
 
           <button
@@ -126,13 +134,13 @@ export const RegisterPage = () => {
                      disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isLoading && <LoadingSpinner size="sm" className="text-white" />}
-            {isLoading ? 'Creating Account...' : 'Create Account'}
+            {isLoading ? "Creating Account..." : "Create Account"}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-200 text-center">
           <p className="text-gray-600">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link
               to="/login"
               className="text-blue-600 hover:text-blue-700 font-medium"
@@ -143,15 +151,11 @@ export const RegisterPage = () => {
         </div>
       </FormWrapper>
 
-      {showToast && (error || successMessage) && (
+      {toastInfo.show && (
         <Toast
-          message={error || successMessage}
-          type={error ? 'error' : 'success'}
-          onClose={() => {
-            setShowToast(false);
-            if (error) clearError();
-            if (successMessage) setSuccessMessage('');
-          }}
+          message={toastInfo.message}
+          type={toastInfo.type}
+          onClose={() => setToastInfo({ ...toastInfo, show: false })}
         />
       )}
     </>

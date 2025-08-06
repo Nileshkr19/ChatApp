@@ -157,22 +157,22 @@ const verifyOtp = asyncHandler(async (req, res) => {
   }
 
   if (type === "forgot") {
-    const userExists = await prisma.user.findUnique({
-      where: { email: user.email },
-    });
-    if (!userExists) {
-      throw new ApiError(404, "User not found");
-    }
-
-    // Set short-lived flag in Redis to allow reset
-    await redisClient.set(`forgot-verified:${token}`, "true", { EX: 300 });
-
-    await redisClient.del(key);
-
-    return res
-      .status(200)
-      .json(new ApiResponse(200, null, "OTP verified. You may now reset your password."));
+  const userExists = await prisma.user.findUnique({
+    where: { email: user.email },
+  });
+  if (!userExists) {
+    throw new ApiError(404, "User not found");
   }
+
+  // Set short-lived flag in Redis to allow reset
+  await redisClient.setex(`forgot-verified:${token}`, 300 , "true"); 
+
+  await redisClient.del(key);
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, null, "OTP verified. You may now reset your password."));
+}
 
   throw new ApiError(400, "Invalid request type");
 });
@@ -346,61 +346,48 @@ const forgotPassword = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        { context: "FORGOT_PASSWORD" },
+         { token: token },
+
         "OTP sent to your email. It is valid for 15 minutes."
       )
     );
 });
 
 const resetPassword = asyncHandler(async (req, res) => {
+  // Get email from the request body, which the frontend already sends
+  const { token, password, email } = req.body;
+
+  if (!token || !password || !email) {
+    throw new ApiError(400, "Email, token, and password are required");
+  }
+
+  // 1. Check if the OTP was actually verified
+  const isVerified = await redisClient.get(`forgot-verified:${token}`);
+  if (!isVerified) {
+    throw new ApiError(401, "Invalid or expired token. Please verify OTP again.");
+  }
   
-   const {token, password, confirmPassword} = req.body;
-
-  if (!password || !confirmPassword) {
-    throw new ApiError(400, "Password, and confirm password are required");
-  }
-  if (password !== confirmPassword) {
-    throw new ApiError(400, "Passwords do not match");
-  }
-
-   const isVerified = await redisClient.get(`forgot-verified:${token}`);
-  if (isVerified !== "true") {
-    throw new ApiError(403, "OTP not verified or expired");
-  }
-  const redisKey = `forgot:${token}`;
-  const redisData = await redisClient.get(redisKey);
-  if (!redisData) {
-    throw new ApiError(404, "Invalid or expired token");
-  }
-  const userData = JSON.parse(redisData);
-  if (userData.otpExpiresAt < Date.now()) {
-    throw new ApiError(400, "OTP has expired");
-  }
-  const user = await prisma.user.findUnique({
-    where: { email: userData.email },
-  });
-  if (!user) {
-    throw new ApiError(404, "User not found");
-  }
-
-  const {isValid, errors} = validatePassword(password);
+  // 2. Validate the new password
+  const { isValid, errors } = validatePassword(password);
   if (!isValid) {
     throw new ApiError(400, `Password validation failed: ${errors.join(", ")}`);
   }
 
+  // 3. Hash the new password
   const hashedPassword = await hashPassword(password);
-  if (!hashedPassword) {
-    throw new ApiError(500, "Error hashing password");
-  }
+
+  // 4. Update the user in the database
   await prisma.user.update({
-    where: { email: userData.email },
-    data: { password: hashedPassword, isVerified: true },
+    where: { email: email }, // Use the email from the request body
+    data: { password: hashedPassword },
   });
-  await redisClient.del(redisKey);
+
+  // 5. Clean up the used token from Redis
+  await redisClient.del(`forgot-verified:${token}`);
+
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Password reset successfully"));
-
 });
 
 

@@ -1,36 +1,35 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import { FormWrapper } from '@/components/FormWrapper';
 import { InputField } from '@/components/InputField';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Toast } from '@/components/Toast';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '@/features/auth/authSlice';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showToast, setShowToast] = useState(false);
-  
-  const { login, isLoading, error, clearError, isAuthenticated } = useAuth();
+
+  const dispatch = useDispatch();
+  const { loading: isLoading, error } = useSelector((state) => state.auth);
+
+
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
-    }
-  }, [isAuthenticated, navigate]);
-
-  useEffect(() => {
-    if (error) {
-      setShowToast(true);
-    }
-  }, [error]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    clearError();
-    await login({ email, password });
+    try {
+      await dispatch(loginUser({ email, password })).unwrap();
+      console.log("Login successful");
+      navigate('/dashboard'); // Redirect to dashboard on successful login
+    } catch (err) {
+      setShowToast(true);
+      console.error("Login failed:", err);
+    }
   };
 
   return (
@@ -79,7 +78,7 @@ export const LoginPage = () => {
 
           <button
             type="submit"
-            disabled={isLoading}
+            
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium
                      hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all duration-200
                      disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
@@ -108,7 +107,7 @@ export const LoginPage = () => {
           type="error"
           onClose={() => {
             setShowToast(false);
-            clearError();
+           
           }}
         />
       )}

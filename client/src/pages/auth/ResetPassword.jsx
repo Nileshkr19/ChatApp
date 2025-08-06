@@ -1,85 +1,65 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
 import { FormWrapper } from '@/components/FormWrapper';
 import { InputField } from '@/components/InputField';
 import { PasswordStrengthMeter } from '@/components/PasswordStrengthMeter';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { Toast } from '@/components/Toast';
+import { useDispatch, useSelector } from 'react-redux';
+import { resetPassword } from '@/features/auth/authSlice';
 
 export const ResetPasswordPage = () => {
   const [formData, setFormData] = useState({
     password: '',
     confirmPassword: '',
   });
+  // State for toggling password visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [validationError, setValidationError] = useState('');
   
-  const { resetPassword, isLoading, error, clearError } = useAuth();
-  const location = useLocation();
+  const [toastInfo, setToastInfo] = useState({ show: false, message: '', type: 'error' });
+  
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   
-  const email = location.state?.email;
-  const verified = location.state?.verified;
+  const { loading: isLoading, error: apiError } = useSelector((state) => state.auth);
 
+  const email = location.state?.email;
+  const token = location.state?.token;
+
+  // This hook ensures the user can't be on this page without a valid email and token
   useEffect(() => {
-    if (!email || !verified) {
+    if (!email || !token) {
       navigate('/forgot-password');
     }
-  }, [email, verified, navigate]);
-
-  useEffect(() => {
-    if (error) {
-      setShowToast(true);
-    }
-  }, [error]);
+  }, [email, token, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear validation error when user starts typing
-    if (validationError) {
-      setValidationError('');
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const validatePasswords = () => {
-    if (formData.password !== formData.confirmPassword) {
-      setValidationError('Passwords do not match');
-      return false;
-    }
-    
-    if (formData.password.length < 8) {
-      setValidationError('Password must be at least 8 characters long');
-      return false;
-    }
-    
-    return true;
-  };
-
-  const handleSubmit = async (e ) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    clearError();
-    
-    if (!validatePasswords()) {
-      return;
+
+    if (formData.password !== formData.confirmPassword) {
+        setToastInfo({ show: true, message: "Passwords do not match.", type: 'error' });
+        return;
     }
     
-    await resetPassword(formData);
+    const payload = { email, token, password: formData.password };
     
-    if (!error) {
-      setSuccessMessage('Password reset successfully!');
-      setShowToast(true);
+    try {
+      await dispatch(resetPassword(payload)).unwrap();
+      
+      setToastInfo({ show: true, message: 'Password reset successful! You can now log in.', type: 'success' });
       setTimeout(() => {
         navigate('/login');
       }, 2000);
+    } catch (err) {
+      setToastInfo({ show: true, message: apiError?.message || err.message, type: 'error' });
+      console.error("Reset password failed:", err);
     }
   };
 
@@ -93,14 +73,15 @@ export const ResetPasswordPage = () => {
           <InputField
             label="New Password"
             name="password"
+            // Toggles between 'text' and 'password' type
             type={showPassword ? 'text' : 'password'}
             value={formData.password}
             onChange={handleChange}
             placeholder="Enter new password"
+            // Props to control the toggle icon in your InputField component
             showPasswordToggle
             showPassword={showPassword}
             onTogglePassword={() => setShowPassword(!showPassword)}
-            error={validationError && validationError.includes('Password') ? validationError : ''}
             required
           />
 
@@ -109,14 +90,15 @@ export const ResetPasswordPage = () => {
           <InputField
             label="Confirm New Password"
             name="confirmPassword"
+            // Toggles between 'text' and 'password' type
             type={showConfirmPassword ? 'text' : 'password'}
             value={formData.confirmPassword}
             onChange={handleChange}
             placeholder="Confirm new password"
+            // Props to control the toggle icon
             showPasswordToggle
             showPassword={showConfirmPassword}
             onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
-            error={validationError && validationError.includes('match') ? validationError : ''}
             required
           />
 
@@ -133,15 +115,11 @@ export const ResetPasswordPage = () => {
         </form>
       </FormWrapper>
 
-      {showToast && (error || successMessage) && (
+      {toastInfo.show && (
         <Toast
-          message={error || successMessage}
-          type={error ? 'error' : 'success'}
-          onClose={() => {
-            setShowToast(false);
-            if (error) clearError();
-            if (successMessage) setSuccessMessage('');
-          }}
+          message={toastInfo.message}
+          type={toastInfo.type}
+          onClose={() => setToastInfo({ ...toastInfo, show: false })}
         />
       )}
     </>

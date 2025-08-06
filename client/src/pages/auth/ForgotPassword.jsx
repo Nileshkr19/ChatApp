@@ -1,46 +1,76 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { FormWrapper } from '@/components/FormWrapper';
-import { InputField } from '@/components/InputField';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { Toast } from '@/components/Toast';
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { FormWrapper } from "@/components/FormWrapper";
+import { InputField } from "@/components/InputField";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { Toast } from "@/components/Toast";
+import { useDispatch, useSelector } from "react-redux";
+import { forgotPassword } from "@/features/auth/authSlice";
 
 export const ForgotPasswordPage = () => {
-  const [email, setEmail] = useState('');
-  const [showToast, setShowToast] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  
-  const { sendOTP, isLoading, error, clearError } = useAuth();
+  const [email, setEmail] = useState("");
+  // Renaming to avoid confusion
+  const [toastInfo, setToastInfo] = useState({ show: false, message: '', type: 'error' });
+
+  const dispatch = useDispatch();
+  // Renaming Redux error to avoid conflict
+  const { loading: isLoading, error: apiError } = useSelector((state) => state.auth);
+
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (error) {
-      setShowToast(true);
-    }
-  }, [error]);
+  // In ForgotPasswordPage.js
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
-    clearError();
-    
-    await sendOTP(email, 'forgot-password');
-    
-    if (!error) {
-      setSuccessMessage('OTP sent to your email successfully!');
-      setShowToast(true);
-      setTimeout(() => {
-        navigate('/verify-otp', { 
-          state: { email, type: 'forgot-password' } 
+    try {
+      const result = await dispatch(forgotPassword({ email })).unwrap();
+
+      // --- CRUCIAL DEBUGGING LOG ---
+      // We MUST see what this prints in your browser's console.
+      console.log("Response from forgotPassword API:", result);
+
+      // Defensive Check: Make sure a token exists before navigating.
+      if (result && result.token) {
+        setToastInfo({
+            show: true,
+            message: result.message || "Reset code sent! Check your email.",
+            type: 'success'
         });
-      }, 2000);
+        
+        setTimeout(() => {
+          navigate("/verify-otp", {
+            state: {
+              email,
+              type: "forgot",
+              token: result.token,
+            },
+          });
+        }, 2000);
+
+      } else {
+        // This will happen if the backend fix didn't work.
+        console.error("ERROR: No token received from the backend.");
+        setToastInfo({
+            show: true,
+            message: "Could not get verification token from server. Please try again.",
+            type: 'error'
+        });
+      }
+
+    } catch (err) {
+      setToastInfo({
+          show: true,
+          message: apiError?.message || err.message || "Failed to send reset code.",
+          type: 'error'
+      });
+      console.error("Forgot password API call failed:", err);
     }
   };
 
   return (
     <>
-      <FormWrapper 
-        title="Forgot Password" 
+      <FormWrapper
+        title="Forgot Password"
         subtitle="Enter your email to receive a reset code"
       >
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -61,13 +91,13 @@ export const ForgotPasswordPage = () => {
                      disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isLoading && <LoadingSpinner size="sm" className="text-white" />}
-            {isLoading ? 'Sending OTP...' : 'Send Reset Code'}
+            {isLoading ? "Sending Code..." : "Send Reset Code"}
           </button>
         </form>
 
         <div className="mt-8 pt-6 border-t border-gray-200 text-center">
           <p className="text-gray-600">
-            Remember your password?{' '}
+            Remember your password?{" "}
             <Link
               to="/login"
               className="text-blue-600 hover:text-blue-700 font-medium"
@@ -78,15 +108,11 @@ export const ForgotPasswordPage = () => {
         </div>
       </FormWrapper>
 
-      {showToast && (error || successMessage) && (
+      {toastInfo.show && (
         <Toast
-          message={error || successMessage}
-          type={error ? 'error' : 'success'}
-          onClose={() => {
-            setShowToast(false);
-            if (error) clearError();
-            if (successMessage) setSuccessMessage('');
-          }}
+          message={toastInfo.message}
+          type={toastInfo.type}
+          onClose={() => setToastInfo({ ...toastInfo, show: false })}
         />
       )}
     </>

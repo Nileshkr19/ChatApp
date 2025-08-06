@@ -1,13 +1,12 @@
 import React from 'react';
-import { useAuth } from '@/hooks/useAuth';
 import { User, Mail, MessageSquare, LogOut, Settings } from 'lucide-react';
+import { Logout } from './auth/Logout';
 
 export const DashboardPage  = () => {
-  const { user, logout } = useAuth();
-
-  const handleLogout = () => {
-    logout();
-  };
+ 
+  const user = {
+    name: "John Doe",
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50">
@@ -21,19 +20,8 @@ export const DashboardPage  = () => {
               </div>
               <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
             </div>
-            
-            <div className="flex items-center gap-4">
-              <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                <Settings size={20} />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-gray-700 hover:text-red-600 transition-colors"
-              >
-                <LogOut size={16} />
-                <span>Logout</span>
-              </button>
-            </div>
+            <Logout />   
+
           </div>
         </div>
       </header>
