@@ -12,7 +12,7 @@ export const Logout = () => {
       .unwrap()
       .then(() => {
         console.log("User logged out successfully");
-        navigate("/login"); // Redirect to login page after logout
+        navigate("/login");
       })
       .catch((error) => {
         console.error("Logout failed:", error);

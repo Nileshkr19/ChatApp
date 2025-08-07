@@ -1,22 +1,15 @@
 import React from "react";
-import { Navigate } from "react-router-dom";
-import { useAuth } from '@/hooks/useAuth';
-import { LoadingSpinner } from "../LoadingSpinner";
+import { useSelector } from "react-redux";
+import { Navigate, Outlet } from "react-router-dom";
 
-export const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
+export const ProtectedRoute = () => {
+  const { accessToken } = useSelector((state) => state.auth);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
+  if (accessToken) {
+    return <Outlet />;
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
+  return <Navigate to="/login" replace />;
 };
+
+

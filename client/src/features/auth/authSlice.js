@@ -121,6 +121,9 @@ const authSlice = createSlice({
       .addCase(registerUser.fulfilled, (state, action) => {
         state.loading = false;
         state.verificationToken = action.payload.token;
+        state.user = null;
+        state.accessToken = null; 
+
       })
       .addCase(registerUser.rejected, (state, action) => {
         state.loading = false;
@@ -136,9 +139,9 @@ const authSlice = createSlice({
         state.loading = false;
       if (action.payload) {
             state.user = action.payload.user;
-            state.accessToken = action.payload.accessToken; // Assuming login happens on verify
+            state.accessToken = action.payload.accessToken; 
         }
-        state.verificationToken = null; // Clear token after successful verification
+        state.verificationToken = null; 
       })
       .addCase(verifyOtp.rejected, (state, action) => {
         state.loading = false;

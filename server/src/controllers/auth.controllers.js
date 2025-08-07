@@ -150,6 +150,7 @@ const verifyOtp = asyncHandler(async (req, res) => {
             profileImage: newUser.profileImage,
             bio: newUser.bio,
           },
+          accessToken: accessToken,
         },
         "User registered successfully"
       )
@@ -253,6 +254,7 @@ const loginUser = asyncHandler(async (req, res) => {
           profileImage: userExists.profileImage,
           bio: userExists.bio,
         },
+        accessToken: accessToken,
       },
       "User logged in successfully"
     )
