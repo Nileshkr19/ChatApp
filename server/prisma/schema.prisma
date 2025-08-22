@@ -1,3 +1,6 @@
+// =======================================
+// GENERATOR & DATASOURCE
+// =======================================
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,6 +10,37 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =======================================    
+// ENUMS
+// =======================================
+enum RoomVisibility {
+  PUBLIC
+  PRIVATE
+  INVITE_ONLY
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  FILE
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+// =======================================
+// MODELS
+// =======================================
+
 model User {
   id           String    @id @default(cuid())
   name         String
@@ -15,19 +49,21 @@ model User {
   profileImage String?
   bio          String?
   isVerified   Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
   isOnline     Boolean   @default(false)
   lastSeen     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   // --- Relationships ---
   refreshTokens      RefreshToken[]
   ownedRooms         Room[]             @relation("RoomOwner")
   roomsMember        RoomMember[]
   roomMessages       RoomMessage[]
-  roomMessageReplies RoomMessageReply[]
   messageReactions   MessageReaction[]
+  messageReads       MessageRead[]
+  messageMentions    MessageMention[]
   notifications      Notification[]
+  
 }
 
 model RefreshToken {
@@ -36,106 +72,128 @@ model RefreshToken {
   token     String   @unique
   createdAt DateTime @default(now())
   expiresAt DateTime
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade) // Added onDelete
   isRevoked Boolean  @default(false)
-}
 
-enum RoomVisibility {
-  PUBLIC
-  PRIVATE
-  INVITE_ONLY
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Room {
   id          String         @id @default(cuid())
   name        String
-  roomImage   String?
   description String?
-  ownerId     String
-  owner       User           @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  createdAt   DateTime       @default(now())
+  roomImage   String?
   roomCode    String?        @unique
-  isPrivate   RoomVisibility @default(PUBLIC)
+  roomType    RoomVisibility @default(PUBLIC)
   isDeleted   Boolean        @default(false)
+  createdAt   DateTime       @default(now())
 
+  ownerId String
+  owner   User @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // --- Relationships ---
   roomMembers RoomMember[]
   messages    RoomMessage[]
-}
-
-enum ParticipantRole {
-  ADMIN
-  MEMBER
 }
 
 model RoomMember {
   id       String          @id @default(cuid())
   userId   String
-  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   roomId   String
-  room     Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
   role     ParticipantRole @default(MEMBER)
   joinedAt DateTime        @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
   @@unique([userId, roomId])
 }
 
 model RoomMessage {
-  id               String             @id @default(cuid())
-  roomId           String
-  room             Room               @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  senderId         String
-  sender           User               @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  content          String
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  isEdited         Boolean            @default(false)
-  isDeleted        Boolean            @default(false)
+  id        String      @id @default(cuid())
+  content   String
+  type      MessageType   @default(TEXT)
+  status    MessageStatus @default(SENT)
+  isEdited  Boolean     @default(false)
+  isDeleted Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  // --- Relations ---
+  roomId   String
+  room     Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId String
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
   messageReactions MessageReaction[]
   attachments      FileAttachment[]
-  replies          RoomMessageReply[]
+  readBy           MessageRead[]
+  mentions         MessageMention[]
+
+  parentMessageId String?
+  parentMessage   RoomMessage? @relation("MessageReplies", fields: [parentMessageId], references: [id], onDelete: Cascade)
+  replies         RoomMessage[] @relation("MessageReplies")
 }
+
+
 
 model MessageReaction {
   id            String      @id @default(cuid())
-  roomMessageId String
-  roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   emoji         String
   createdAt     DateTime    @default(now())
+
+  roomMessageId String
+  roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([roomMessageId, userId])
 }
 
 model FileAttachment {
-  id            String      @id @default(cuid())
+  id        String   @id @default(cuid())
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+
   roomMessageId String
   roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
-  fileUrl       String
-  fileType      String
-  createdAt     DateTime    @default(now())
 }
 
-model RoomMessageReply {
-  id            String      @id @default(cuid())
+model MessageRead {
+  id        String   @id @default(cuid())
+  readAt    DateTime @default(now())
+
   roomMessageId String
   roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
-  senderId      String
-  sender        User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  content       String
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomMessageId, userId])
+}
+
+model MessageMention {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  roomMessageId String
+  roomMessage   RoomMessage @relation(fields: [roomMessageId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Notification {
   id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      String
   content   String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
 }

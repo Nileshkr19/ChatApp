@@ -7,8 +7,8 @@ import messagesRoutes from "./src/routes/message.routes.js";
 const router = express.Router();
 
 router.use("/api/v1/auth", authRoutes);
-router.use("/api/v1/tokens", tokensRoutes);
+router.use("/api/v1/auth", tokensRoutes);
 router.use("/api/v1/room", roomRoutes);
-router.use("/api/v1/messages", messagesRoutes);
+router.use("/api/v1/room", messagesRoutes);
 
 export default router;

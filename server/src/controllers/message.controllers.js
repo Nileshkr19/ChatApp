@@ -1,414 +1,528 @@
 import prisma from "../config/prisma.js";
-import { ApiResponse } from "../utils/ApiResponse.js";
-import { ApiError } from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/AsyncHandler.js";
-import { getIo } from "../socket/socket.js";
+import { ApiError } from "../utils/ApiError.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
 
-export const sendMessage = asyncHandler(async (req, res) => {
-  const { chatId, content, messageType = "text", fileUrl } = req.body;
-
-  if (!chatId || !content) {
-    throw new ApiError(
-      400,
-      "Chat ID and content are required to send a message"
-    );
-  }
-
+const createMessage = asyncHandler(async (req, res) => {
+  const { content, type, attachment, mentions } = req.body;
+  const roomId = req.room.id;
   const userId = req.user.id;
 
-  // Check if chat exists, is not deleted, and user is a participant 
-  const existingChat = await prisma.chat.findUnique({
+  if (!content && (!attachment || attachment.length === 0)) {
+    throw new ApiError(400, "Content or attachment is required");
+  }
+  if (!roomId) {
+    throw new ApiError(400, "Room ID is required");
+  }
+  if (!userId) {
+    throw new ApiError(401, "User not authenticated");
+  }
+  const room = await prisma.room.findUnique({
     where: {
-      id: chatId,
+      id: roomId,
       isDeleted: false,
     },
-    include: {
-      participants: {
-        where: { userId },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              profileImage: true,
-            },
-          },
-        },
-      },
+  });
+  if (!room) {
+    throw new ApiError(404, "Room not found");
+  }
+  const member = await prisma.roomMember.findFirst({
+    where: {
+      roomId: room.id,
+      userId: userId,
+      isDeleted: false,
     },
   });
-
-  if (!existingChat || existingChat.participants.length === 0) {
-    throw new ApiError(
-      404,
-      "Chat not found or you are not a participant in this chat"
-    );
+  if (!member) {
+    throw new ApiError(403, "You are not a member of this room");
   }
-
-  // Create the message
-  const message = await prisma.message.create({
+  const message = await prisma.roomMessage.create({
     data: {
-      chatId,
+      content: content || null,
+      type: type || "text",
+      roomId,
       senderId: userId,
-      content,
-      messageType,
-      fileUrl,
+      attachments: attachment
+        ? {
+            createMany: { data: attachment },
+          }
+        : undefined,
+      mentions: mentions
+        ? {
+            createMany: {
+              data: mentions.map((mention) => ({ userId: mention })),
+            },
+          }
+        : undefined,
     },
     include: {
+      attachments: true,
+      mentions: true,
       sender: {
         select: {
           id: true,
           name: true,
-          profileImage: true,
         },
       },
     },
   });
 
-  // Update chat's lastMessageAt
-  await prisma.chat.update({
-    where: { id: chatId },
-    data: { lastMessageAt: new Date() },
-  });
+  if (!message) {
+    throw new ApiError(500, "Failed to create message");
+  }
 
-  // Emit to all participants in the chat room
-  const io = getIo();
-  io.to(chatId).emit("newMessage", {
-    id: message.id,
-    chatId,
-    content,
-    messageType,
-    fileUrl,
-    senderId: userId,
-    sender: message.sender,
-    createdAt: message.createdAt.toISOString(),
-    isEdited: false,
-  });
+  // Emit the new message to the room via socket.io
 
   return res
     .status(201)
-    .json(new ApiResponse(201, { message }, "Message sent successfully"));
+    .json(new ApiResponse(201, "Message created successfully", message));
 });
 
-
-
-export const getAllMessagesInChat = asyncHandler(async (req, res) => {
-  const { chatId } = req.params;
+const editMessage = asyncHandler(async (req, res) => {
+  const { content, type, attachment, mention } = req.body;
+  const { messageId } = req.params;
   const userId = req.user.id;
-  const { cursor, limit = 20 } = req.query;
-
-  // Verify user is participant
-  const chat = await prisma.chat.findFirst({
-    where: {
-      id: chatId,
-      isDeleted: false,
-      participants: {
-        some: { userId },
-      },
-    },
-  });
-
-  if (!chat) {
-    throw new ApiError(404, "Chat not found or you're not a participant");
+  if (!messageId) {
+    throw new ApiError(400, "Message ID is required");
   }
-
-  // Fetch messages
-  const messages = await prisma.message.findMany({
+  const message = await prisma.roomMessage.findFirst({
     where: {
-      chatId,
+      id: messageId,
       isDeleted: false,
     },
     include: {
-      sender: {
-        select: { id: true, name: true, profileImage: true },
-      },
-      readBy: {
+      sender: true,
+    },
+  });
+
+  if (!message) {
+    throw new ApiError(404, "Message not found");
+  }
+  if (message.senderId !== userId) {
+    throw new ApiError(403, "You are not allowed to edit this message");
+  }
+
+  const data = {
+    ...(content !== undefined ? { content } : {}),
+    ...(type !== undefined ? { type } : {}),
+    ...ApiError(
+      attachment !== undefined
+        ? { attachments: { set: [], create: attachment } }
+        : {}
+    ),
+    ...(mention !== undefined
+      ? { mentions: { set: [], create: mention.map((m) => ({ userId: m })) } }
+      : {}),
+  };
+
+  const updatedMessage = await prisma.roomMessage.update({
+    where: {
+      id: messageId,
+    },
+    data: {
+      ...data,
+      isEdited: true,
+    },
+  });
+  if (!updatedMessage) {
+    throw new ApiError(500, "Failed to update message");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Message updated successfully", updatedMessage));
+});
+
+const deleteMessage = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.user.id;
+  if (!messageId) {
+    throw new ApiError(400, "Message ID is required");
+  }
+  const message = await prisma.roomMessage.findFirst({
+    where: {
+      id: messageId,
+      isDeleted: false,
+    },
+    include: {
+      sender: true,
+    },
+  });
+  if (!message) {
+    throw new ApiError(404, "Message not found");
+  }
+  if (message.senderId !== userId && !req.user.isAdmin) {
+    throw new ApiError(
+      403,
+      "You are not allowed to delete this message, only admin or sender can delete the message"
+    );
+  }
+  const deletedMessage = await prisma.roomMessage.update({
+    where: {
+      id: messageId,
+    },
+    data: {
+      isDeleted: true,
+    },
+  });
+  if (!deletedMessage) {
+    throw new ApiError(500, "Failed to delete message");
+  }
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "Message deleted successfully", deletedMessage));
+});
+
+const fetchMessages = asyncHandler(async (req, res) => {
+  const roomId = req.room.id;
+  const { limit = 20, cursor } = req.query;
+  const userId = req.user.id;
+
+  if (!roomId) throw new ApiError(400, "Room ID is required");
+
+  const room = await prisma.room.findFirst({
+    where: { id: roomId, isDeleted: false },
+  });
+  if (!room) throw new ApiError(404, "Room not found");
+
+  const member = await prisma.roomMember.findFirst({
+    where: { roomId: room.id, userId, isDeleted: false },
+  });
+  if (!member) throw new ApiError(403, "You are not a member of this room");
+
+  const messages = await prisma.roomMessage.findMany({
+    where: {
+      roomId: room.id,
+      isDeleted: false,
+    },
+    include: {
+      attachments: true,
+      mentions: {
         include: {
-          user: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, profileImage: true } },
+        },
+      },
+      sender: { select: { id: true, name: true, profileImage: true } },
+      parentMessage: {
+        select: {
+          id: true,
+          content: true,
+          type: true,
+          sender: { select: { id: true, name: true, profileImage: true } },
         },
       },
       messageReactions: {
         include: {
-          user: { select: { id: true, name: true } },
+          user: { select: { id: true, name: true, profileImage: true } },
         },
       },
+      _count: { select: { replies: true } },
     },
     orderBy: { createdAt: "desc" },
-    take: parseInt(limit) + 1, // fetch one extra to detect if there's more
+    take: parseInt(limit),
     ...(cursor && {
+      skip: 1,
       cursor: { id: cursor },
-      skip: 1, // skip the cursor itself
     }),
   });
 
-  let nextCursor = null;
-  if (messages.length > limit) {
-    const nextItem = messages.pop();
-    nextCursor = nextItem.id;
-  }
-
+  const nextCursor =
+    messages.length > 0 ? messages[messages.length - 1].id : null;
   return res.status(200).json(
-    new ApiResponse(200, {
-      messages: messages.reverse(), // Show oldest first
+    new ApiResponse(200, "Messages fetched successfully", {
+      messages,
       nextCursor,
-      pagination: {
-        limit: parseInt(limit),
-        hasMore: nextCursor !== null,
-      },
-    }, "Messages retrieved successfully")
+    })
   );
 });
 
-
-// Mark message as read
-export const markMessageAsRead = asyncHandler(async (req, res) => {
+const messageReply = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
+  const { content, type, attachment, mentions } = req.body;
   const userId = req.user.id;
 
-  // Verify message exists and user has access to it
-  const message = await prisma.message.findFirst({
+  if (!messageId) {
+    throw new ApiError(400, "Message ID is required");
+  }
+
+  const parentMessage = await prisma.roomMessage.findFirst({
     where: {
       id: messageId,
-      chat: {
-        isDeleted: false,
-        participants: {
-          some: { userId },
+      isDeleted: false,
+    },
+    include: {
+      sender: true,
+    },
+  });
+
+  if (!parentMessage) {
+    throw new ApiError(404, "Parent message not found");
+  }
+
+  const reply = await prisma.roomMessage.create({
+    data: {
+      content: content || null,
+      type: type || "text",
+      roomId: parentMessage.roomId,
+      senderId: userId,
+      parentMessageId: messageId,
+      attachments:
+        Array.isArray(attachment) && attachment.length
+          ? { create: attachment }
+          : undefined,
+      mentions:
+        Array.isArray(mentions) && mentions.length
+          ? { create: mentions.map((mentionId) => ({ userId: mentionId })) }
+          : undefined,
+    },
+    include: {
+      attachments: true,
+      mentions: {
+        include: {
+          user: { select: { id: true, name: true, profileImage: true } },
         },
       },
-    },
-  });
-
-  if (!message) {
-    throw new ApiError(404, "Message not found or you don't have access");
-  }
-
-  // Don't mark own messages as read
-  if (message.senderId === userId) {
-    return res
-      .status(200)
-      .json(new ApiResponse(200, null, "Cannot mark your own message as read"));
-  }
-
-  // Create or update read receipt
-  const readReceipt = await prisma.messageRead.upsert({
-    where: {
-      messageId_userId: {
-        messageId,
-        userId,
+      sender: {
+        select: { id: true, name: true, profileImage: true },
       },
     },
-    update: {
-      readAt: new Date(),
-    },
-    create: {
-      messageId,
-      userId,
-      readAt: new Date(),
-    },
   });
 
-  // Emit read receipt to chat participants
-  const io = getIo();
-  io.to(message.chatId).emit("messageRead", {
-    messageId,
-    userId,
-    readAt: readReceipt.readAt.toISOString(),
-  });
+  if (!reply) {
+    throw new ApiError(500, "Failed to create reply");
+  }
 
   return res
-    .status(200)
-    .json(new ApiResponse(200, { readReceipt }, "Message marked as read"));
+    .status(201)
+    .json(new ApiResponse(201, "Reply created successfully", reply));
 });
 
-// Edit a message
-export const editMessage = asyncHandler(async (req, res) => {
+const fetchReplies = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
-  const { content } = req.body;
+  const { limit = 20, cursor } = req.query;
   const userId = req.user.id;
 
-  if (!content) {
-    throw new ApiError(400, "Content is required to edit message");
-  }
+  if (!messageId) throw new ApiError(400, "Message ID is required");
 
-  // Find message and verify ownership
-  const message = await prisma.message.findFirst({
+  const parentMessage = await prisma.roomMessage.findFirst({
+    where: { id: messageId, isDeleted: false },
+  });
+  if (!parentMessage) throw new ApiError(404, "Parent message not found");
+
+  const member = await prisma.roomMember.findFirst({
+    where: { roomId: parentMessage.roomId, userId, isDeleted: false },
+  });
+  if (!member) throw new ApiError(403, "You are not a member of this room");
+
+  const replies = await prisma.roomMessage.findMany({
+    where: {
+      parentMessageId: messageId,
+      isDeleted: false,
+    },
+    include: {
+      attachments: true,
+      mentions: {
+        include: {
+          user: { select: { id: true, name: true, profileImage: true } },
+        },
+      },
+      sender: { select: { id: true, name: true, profileImage: true } },
+      messageReactions: {
+        include: {
+          user: { select: { id: true, name: true, profileImage: true } },
+        },
+      },
+      _count: { select: { replies: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: parseInt(limit),
+    ...(cursor && {
+      skip: 1,
+      cursor: { id: cursor },
+    }),
+  });
+
+  const nextCursor = replies.length > 0 ? replies[replies.length - 1].id : null;
+  return res.status(200).json(
+    new ApiResponse(200, "Replies fetched successfully", {
+      replies,
+      nextCursor,
+    })
+  );
+});
+
+const messageReactions = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const { emoji } = req.body;
+  const userId = req.user.id;
+  if (!messageId) {
+    throw new ApiError(400, "Message ID is required");
+  }
+  if (!emoji) {
+    throw new ApiError(400, "Reaction emoji is required");
+  }
+  const message = await prisma.roomMessage.findFirst({
     where: {
       id: messageId,
-      senderId: userId,
-      chat: {
-        isDeleted: false,
-      },
+      isDeleted: false,
     },
-    include: {
-      sender: {
-        select: {
-          id: true,
-          name: true,
-          profileImage: true,
-        },
-      },
-    },
+    select: { id: true, isDeleted: true },
   });
-
   if (!message) {
-    throw new ApiError(404, "Message not found or you're not the sender");
+    throw new ApiError(404, "Message not found");
   }
-
-  // Update message
-  const updatedMessage = await prisma.message.update({
-    where: { id: messageId },
+  const existingReaction = await prisma.messageReaction.findFirst({
+    where: {
+      roomMessageId: messageId,
+      userId,
+    },
+  });
+  if (existingReaction) {
+    if (existingReaction.emoji === emoji) {
+      await prisma.messageReaction.delete({
+        where: { id: existingReaction.id },
+      });
+      return res
+        .status(200)
+        .json(new ApiResponse(200, "Reaction removed successfully"));
+    } else {
+      const updateReaction = await prisma.messageReaction.update({
+        where: { id: existingReaction.id },
+        data: { emoji },
+      });
+      return res
+        .status(200)
+        .json(
+          new ApiResponse(200, "Reaction updated successfully", updateReaction)
+        );
+    }
+  }
+  // Add new reaction
+  const newReaction = await prisma.messageReaction.create({
     data: {
-      content,
-      isEdited: true,
-      updatedAt: new Date(),
-    },
-    include: {
-      sender: {
-        select: {
-          id: true,
-          name: true,
-          profileImage: true,
-        },
-      },
+      messageId,
+      userId,
+      emoji,
     },
   });
-
-  // Emit message edit to chat participants
-  const io = getIo();
-  io.to(message.chatId).emit("messageEdited", {
-    messageId,
-    content,
-    isEdited: true,
-    updatedAt: updatedMessage.updatedAt.toISOString(),
-  });
-
+  if (!newReaction) {
+    throw new ApiError(500, "Failed to add reaction");
+  }
   return res
-    .status(200)
+    .status(201)
+    .json(new ApiResponse(201, "Reaction added successfully", newReaction));
+});
+
+const markMessageAsRead = asyncHandler(async (req, res) => {
+  const { messageId } = req.params;
+  const userId = req.user.id;
+  if (!messageId) {
+    throw new ApiError(400, "Message ID is required");
+  }
+  const message = await prisma.roomMessage.findFirst({
+    where: {
+      id: messageId,
+      isDeleted: false,
+    },
+    select: { id: true, isDeleted: true },
+  });
+  if (!message) {
+    throw new ApiError(404, "Message not found");
+  }
+  const existingRead = await prisma.messageRead.findFirst({
+    where: {
+      roomMessageId: messageId,
+      userId,
+    },
+  });
+  if (existingRead) {
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "Message already marked as read"));
+  }
+  const markRead = await prisma.messageRead.create({
+    data: {
+      roomMessageId: messageId,
+      userId,
+    },
+  });
+  if (!markRead) {
+    throw new ApiError(500, "Failed to mark message as read");
+  }
+  return res
+    .status(201)
     .json(
-      new ApiResponse(
-        200,
-        { message: updatedMessage },
-        "Message edited successfully"
-      )
+      new ApiResponse(201, "Message marked as read successfully", markRead)
     );
 });
 
-export const deleteMessage = asyncHandler(async (req, res) => {
-  const { messageId } = req.params;
+const searchMessages = asyncHandler(async (req, res) => {
+  const roomId = req.room.id;
+  const { query, senderId, limit = 20, cursor } = req.query;
   const userId = req.user.id;
 
-  // Find message and verify ownership
-  const message = await prisma.message.findFirst({
+  if (!roomId) throw new ApiError(400, "Room ID is required");
+  if (!query) throw new ApiError(400, "Search query is required");
+
+  // Verify user is a member
+  const member = await prisma.roomMember.findFirst({
+    where: { roomId, userId, isDeleted: false },
+  });
+  if (!member) throw new ApiError(403, "You are not a member of this room");
+
+  // Search messages
+  const messages = await prisma.roomMessage.findMany({
     where: {
-      id: messageId,
-      senderId: userId,
-      isDeleted: false, 
-      chat: {
-        isDeleted: false,
-      },
-    },
-  });
-
-  if (!message) {
-    throw new ApiError(404, "Message not found or you're not the sender");
-  }
-
-  // Soft delete the message instead of hard delete
-  const deletedMessage = await prisma.message.update({
-    where: { id: messageId },
-    data: {
-      isDeleted: true,
-      content: "This message was deleted", // Optional: Replace content
-      updatedAt: new Date(),
-    },
-  });
-
-  // Emit message deletion to chat participants
-  const io = getIo();
-  io.to(message.chatId).emit("messageDeleted", {
-    messageId,
-    deletedAt: deletedMessage.updatedAt.toISOString(),
-  });
-
-  return res
-    .status(200)
-    .json(new ApiResponse(200, null, "Message deleted successfully"));
-});
-
-export const searchMessages = asyncHandler(async (req, res) => {
-  const { chatId } = req.params;
-  const { query, page = 1, limit = 50 } = req.query;
-  const userId = req.user.id;
-
-  if (!query) {
-    throw new ApiError(400, "Search query is required");
-  }
-
-  const chat = await prisma.chat.findFirst({
-    where: {
-      id: chatId,
+      roomId,
       isDeleted: false,
-      participants: {
-        some: { userId },
-      },
+      content: { contains: query, mode: "insensitive" },
+      ...(senderId ? { senderId } : {}),
     },
+    include: {
+      sender: { select: { id: true, name: true, profileImage: true } },
+      attachments: true,
+      mentions: {
+        include: {
+          user: { select: { id: true, name: true } },
+        },
+      },
+      parentMessage: {
+        select: {
+          id: true,
+          content: true,
+          type: true,
+          sender: { select: { id: true, name: true, profileImage: true } },
+        },
+      },
+      messageReactions: {
+        include: {
+          user: { select: { id: true, name: true, profileImage: true } },
+        },
+      },
+      _count: { select: { replies: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: parseInt(limit),
+    ...(cursor && { skip: 1, cursor: { id: cursor } }),
   });
 
-  if (!chat) {
-    throw new ApiError(404, "Chat not found or you're not a participant");
-  }
-
-  const skip = (page - 1) * limit;
-
-  const [messages, totalCount] = await Promise.all([
-    prisma.message.findMany({
-      where: {
-        chatId,
-        content: {
-          contains: query,
-          mode: "insensitive",
-        },
-        isDeleted: false,
-      },
-      include: {
-        sender: {
-          select: {
-            id: true,
-            name: true,
-            profileImage: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: parseInt(skip),
-      take: parseInt(limit),
-    }),
-    prisma.message.count({
-      where: {
-        chatId,
-        content: {
-          contains: query,
-          mode: "insensitive",
-        },
-        isDeleted: false,
-      },
-    }),
-  ]);
-
+  const nextCursor =
+    messages.length > 0 ? messages[messages.length - 1].id : null;
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      {
-        messages: messages.reverse(),
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalCount,
-          totalPages: Math.ceil(totalCount / limit),
-          hasMore: messages.length === parseInt(limit),
-        },
-      },
-      "Messages retrieved successfully"
-    )
+    new ApiResponse(200, "Messages fetched successfully", {
+      messages,
+      nextCursor,
+    })
   );
 });
+
+export {
+  createMessage,
+  editMessage,
+  deleteMessage,
+  fetchMessages,
+  messageReply,
+  fetchReplies,
+  messageReactions,
+  markMessageAsRead,
+  searchMessages,
+};

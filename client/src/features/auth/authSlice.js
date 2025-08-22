@@ -90,6 +90,20 @@ export const resetPassword = createAsyncThunk(
   }
 );
 
+export const refreshAccessToken = createAsyncThunk(
+  "auth/refreshAccessToken",
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await axiosInstance.get("/auth/refresh-token");
+      console.log("Refresh token response:", res.data);
+      return res.data.data;
+    } catch (error) {
+      console.error("Refresh token error:", error);
+      return rejectWithValue(error.response.data);
+    }
+  } 
+)
+
 const authSlice = createSlice({
   name: "auth",
   initialState: {
@@ -208,6 +222,22 @@ const authSlice = createSlice({
       .addCase(resetPassword.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Reset password failed";
+      });
+
+    builder
+      .addCase(refreshAccessToken.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(refreshAccessToken.fulfilled, (state, action) => {
+        state.loading = false;
+        state.accessToken = action.payload.accessToken; 
+      })
+      .addCase(refreshAccessToken.rejected, (state, action) => {
+        state.loading = false;
+        state.user = null;
+        state.accessToken = null;
+        state.error = action.payload?.message || "Failed to refresh access token";
       });
   },
 });

@@ -11,16 +11,17 @@ import {
 } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
 import authReducer from '../features/auth/authSlice';
+import roomReducer from '../features/room/roomSlice'; // Assuming this is the correct path
+import { setupAxiosInterceptors } from '../api/axios';
 
 const rootReducer = combineReducers({
     auth: authReducer,
+    rooms: roomReducer, 
 });
 
 const persistConfig = {
   key: 'root',
   storage,
-  // --- THIS IS THE FIX ---
-  // The whitelist should contain the name of the reducer key from rootReducer.
   whitelist: ['auth'], 
 };
 
@@ -28,6 +29,7 @@ const persistedReducer = persistReducer(persistConfig, rootReducer);
 
 export const store = configureStore({
   reducer: persistedReducer,
+      
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
@@ -35,5 +37,7 @@ export const store = configureStore({
       },
     }),
 });
+
+setupAxiosInterceptors(store);
 
 export const persistor = persistStore(store);
