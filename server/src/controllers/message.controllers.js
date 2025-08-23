@@ -2,6 +2,7 @@ import prisma from "../config/prisma.js";
 import { asyncHandler } from "../utils/AsyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { emitToChat } from "../socket/index.js";
 
 const createMessage = asyncHandler(async (req, res) => {
   const { content, type, attachment, mentions } = req.body;
@@ -72,6 +73,7 @@ const createMessage = asyncHandler(async (req, res) => {
   }
 
   // Emit the new message to the room via socket.io
+  emitToChat(roomId, "newMessage", message);
 
   return res
     .status(201)
@@ -105,13 +107,13 @@ const editMessage = asyncHandler(async (req, res) => {
   const data = {
     ...(content !== undefined ? { content } : {}),
     ...(type !== undefined ? { type } : {}),
-    ...ApiError(
+    ...(
       attachment !== undefined
-        ? { attachments: { set: [], create: attachment } }
+        ? { attachments: { set: [], createMany: attachment } }
         : {}
     ),
     ...(mention !== undefined
-      ? { mentions: { set: [], create: mention.map((m) => ({ userId: m })) } }
+      ? { mentions: { set: [], createMany: mention.map((m) => ({ userId: m })) } }
       : {}),
   };
 
@@ -127,6 +129,10 @@ const editMessage = asyncHandler(async (req, res) => {
   if (!updatedMessage) {
     throw new ApiError(500, "Failed to update message");
   }
+
+  // Emit the updated message to the room via socket.io
+  emitToChat(message.roomId, "messageUpdated", updatedMessage);
+
   return res
     .status(200)
     .json(new ApiResponse(200, "Message updated successfully", updatedMessage));
@@ -167,9 +173,20 @@ const deleteMessage = asyncHandler(async (req, res) => {
   if (!deletedMessage) {
     throw new ApiError(500, "Failed to delete message");
   }
+
+  // Emit the deleted message to the room via socket.io
+  emitToChat(message.roomId, "messageDeleted", { 
+    messageId: deletedMessage.id, 
+    roomId: message.roomId
+   });
+
+
   return res
     .status(200)
-    .json(new ApiResponse(200, "Message deleted successfully", deletedMessage));
+    .json(new ApiResponse(200, "Message deleted successfully", {
+      messageId: deletedMessage.id,
+      isDeleted: true,
+    }));
 });
 
 const fetchMessages = asyncHandler(async (req, res) => {
@@ -291,6 +308,9 @@ const messageReply = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to create reply");
   }
 
+  // Emit the new reply to the room via socket.io
+  emitToChat(parentMessage.roomId, "newReply", reply);
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Reply created successfully", reply));
@@ -365,7 +385,7 @@ const messageReactions = asyncHandler(async (req, res) => {
       id: messageId,
       isDeleted: false,
     },
-    select: { id: true, isDeleted: true },
+    select: { id: true, roomId:true, isDeleted: true },
   });
   if (!message) {
     throw new ApiError(404, "Message not found");
@@ -407,6 +427,10 @@ const messageReactions = asyncHandler(async (req, res) => {
   if (!newReaction) {
     throw new ApiError(500, "Failed to add reaction");
   }
+
+  // Emit the new reaction to the room via socket.io
+  emitToChat(message.roomId, "newReaction", newReaction);
+
   return res
     .status(201)
     .json(new ApiResponse(201, "Reaction added successfully", newReaction));

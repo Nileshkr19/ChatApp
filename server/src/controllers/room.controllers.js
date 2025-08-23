@@ -4,6 +4,7 @@ import { asyncHandler } from "../utils/AsyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { generateRoomCode } from "../utils/generateCode.js";
+import { emitToUser, emitToChat } from "../socket/index.js";
 
 // --- Helpers ---
 const normalizeRoomType = (raw) => {
@@ -79,6 +80,10 @@ export const createRoom = asyncHandler(async (req, res) => {
       ? `${baseUrl}/join-room?roomId=${room.id}`
       : `${baseUrl}/join-room?roomId=${room.id}&code=${room.roomCode}`;
 
+
+  emitToUser(userId, "newRoom", { room });
+
+
   return res
     .status(201)
     .json(
@@ -115,6 +120,9 @@ export const joinRoom = asyncHandler(async (req, res) => {
   const newMember = await prisma.roomMember.create({
     data: { roomId, userId, role: "MEMBER" },
   });
+
+  emitToChat(roomId, "memberJoined", { userId, roomId });
+  emitToUser(userId, "joinedRoom", { roomId });
 
   return res
     .status(200)
@@ -306,6 +314,9 @@ export const editRoomDetails = asyncHandler(async (req, res) => {
     data,
   });
 
+  emitToChat(roomId, "roomUpdated", { roomId, updates: data });
+
+
   return res
     .status(200)
     .json(
@@ -340,6 +351,9 @@ export const deleteRoom = asyncHandler(async (req, res) => {
     data: { isDeleted: true },
   });
 
+  emitToChat(roomId, "roomDeleted", { roomId });
+  emitToUser(userId.toString(), "deletedRoom", { roomId });
+
   return res
     .status(200)
     .json(new ApiResponse(200, {}, "Room deleted successfully"));
@@ -371,6 +385,9 @@ export const leaveRoom = asyncHandler(async (req, res) => {
   if (!membership) throw new ApiError(404, "You are not a member of this room");
 
   await prisma.roomMember.delete({ where: { id: membership.id } });
+
+  emitToChat(roomId, "memberLeft", { userId, roomId });
+  emitToUser(userId.toString(), "leftRoom", { roomId });
 
   return res
     .status(200)
@@ -411,6 +428,8 @@ export const kickMember = asyncHandler(async (req, res) => {
   }
   await prisma.roomMember.delete({ where: { id: member.id } });
 
+  emitToUser(memberId, "kicked", { roomId });
+  emitToChat(roomId, "memberKicked", { memberId, roomId });
 
   return res
     .status(200)
@@ -455,6 +474,9 @@ export const TransferOwnerShip = asyncHandler(async (req, res) => {
       data: { role: "ADMIN" },
     });
   }
+
+  emitToChat(roomId, "ownershipTransferred", { newOwnerId, roomId });
+  emitToUser(newOwnerId, "becameOwner", { roomId });
 
   return res
     .status(200)

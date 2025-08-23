@@ -7,7 +7,7 @@ import router from "./app.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import { errorHandler } from "./src/middlewares/errorHandler.js";
-import { initSocket } from "./src/socket/socket.js";
+import { initSocket } from "./src/socket/index.js";
 import http from "http";
 
 const app = express();

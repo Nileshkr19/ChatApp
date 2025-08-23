@@ -5,12 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js",
-    "cy:open": "cypress open",
-    "cy:run": "cypress run",
-    "cy:test": "start-server-and-test dev http://localhost:5000 cy:run",
-    "test": "cypress run",
-    "test:auth": "cypress run --spec 'cypress/e2e/auth.controller.test.cy.js'"
+    "dev": "nodemon index.js"
   },
   "keywords": [],
   "author": "",
@@ -35,7 +30,6 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "cypress": "^14.5.3",
     "prisma": "^6.13.0",
     "start-server-and-test": "^2.0.12"
   }
